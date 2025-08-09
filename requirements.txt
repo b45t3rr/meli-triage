@@ -1,0 +1,38 @@
+# CrewAI y dependencias principales
+crewai
+crewai-tools
+langchain
+langchain-openai
+openai
+
+# Herramientas de análisis
+PyPDF2
+semgrep
+
+# Utilidades
+requests
+psutil
+pydantic
+python-dotenv
+
+# Librerías de logging y formato
+colorama
+rich
+
+# Procesamiento de texto
+nltk
+textstat
+unidecode
+
+# Análisis de archivos
+python-magic
+
+# Networking
+urllib3
+certifi
+
+# JSON/YAML
+PyYAML
+
+# Fecha/Tiempo
+python-dateutil

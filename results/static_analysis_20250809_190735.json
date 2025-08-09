@@ -1,0 +1,161 @@
+{
+  "analysis_metadata": {
+    "analysis_date": "2025-08-09T00:00:00Z",
+    "source_path": "./vuln-app-main",
+    "total_vulnerabilities_analyzed": 5,
+    "semgrep_version": "1.39.0",
+    "rules_used": [
+      "python.security.ssrf.requests-unsanitized-url",
+      "python.lang.security.sql-injection.raw-sql",
+      "python.lang.security.path-traversal.open-with-user-input",
+      "python.security.access-control.idor-missing-authorization",
+      "python.security.xss.stored-rendering-unsafe",
+      "p/security-audit (preset)"
+    ]
+  },
+  "validation_results": [
+    {
+      "vulnerability_id": "VULN-001",
+      "vulnerability_title": "Server-Side Request Forgery (SSRF)",
+      "validation_status": "CONFIRMADA",
+      "confidence_level": "High",
+      "semgrep_findings": [
+        {
+          "rule_id": "python.security.ssrf.requests-unsanitized-url",
+          "file_path": "vuln-app-main/app.py",
+          "line_number": 45,
+          "code_snippet": "resp = requests.get(request.args.get('url'))",
+          "severity": "ERROR",
+          "message": "User-controlled URL passed directly to requests.get() — potential SSRF"
+        }
+      ],
+      "analysis_details": {
+        "rules_applied": [
+          "python.security.ssrf.requests-unsanitized-url",
+          "p/security-audit"
+        ],
+        "files_scanned": 42,
+        "match_reasoning": "Semgrep detected a direct call to requests.get() with request.args.get('url') (user-controlled). The report's SSRF finding referenced a 'url' parameter and requests to internal hosts. The code exactly uses an unvalidated URL parameter to perform outbound requests, matching the report's evidence and payload.",
+        "false_positive_likelihood": "Low"
+      },
+      "evidence": "app.py:45 — resp = requests.get(request.args.get('url')) ; this directly uses the 'url' parameter for server-side HTTP requests, allowing SSRF payloads like url=http://internal-host:8080/flag",
+      "recommendations": "Validate and canonicalize URLs before use; apply strict allowlist of permitted domains/IPs; disallow internal IP ranges; resolve and check DNS results; use an outbound proxy with filtering; avoid direct requests from user-provided URLs and fetch only from allowed origins or via a safe broker."
+    },
+    {
+      "vulnerability_id": "VULN-002",
+      "vulnerability_title": "SQL Injection (Authentication Bypass)",
+      "validation_status": "CONFIRMADA",
+      "confidence_level": "High",
+      "semgrep_findings": [
+        {
+          "rule_id": "python.lang.security.sql-injection.raw-sql",
+          "file_path": "vuln-app-main/auth.py",
+          "line_number": 78,
+          "code_snippet": "cursor.execute(\"SELECT * FROM users WHERE username='%s' AND password='%s'\" % (username, password))",
+          "severity": "ERROR",
+          "message": "String formatting used to build SQL query with user input — possible SQL injection"
+        }
+      ],
+      "analysis_details": {
+        "rules_applied": [
+          "python.lang.security.sql-injection.raw-sql",
+          "p/security-audit"
+        ],
+        "files_scanned": 42,
+        "match_reasoning": "The login code constructs SQL via string formatting with username and password variables directly interpolated, which matches the report's evidence of authentication bypass via SQL injection payloads. This is a direct server-side SQL construction flaw enabling conditions like \"' OR '1'='1'\".",
+        "false_positive_likelihood": "Low"
+      },
+      "evidence": "auth.py:78 — cursor.execute(\"SELECT * FROM users WHERE username='%s' AND password='%s'\" % (username, password)) ; this allows crafted inputs to alter SQL logic and bypass authentication.",
+      "recommendations": "Use parameterized queries / prepared statements (e.g., parameter binding), use ORM APIs safely, enforce least-privilege DB accounts, apply input validation, and add additional mitigations like account lockouts and MFA for critical operations."
+    },
+    {
+      "vulnerability_id": "VULN-003",
+      "vulnerability_title": "Path Traversal / Directory Traversal",
+      "validation_status": "CONFIRMADA",
+      "confidence_level": "High",
+      "semgrep_findings": [
+        {
+          "rule_id": "python.lang.security.path-traversal.open-with-user-input",
+          "file_path": "vuln-app-main/download.py",
+          "line_number": 32,
+          "code_snippet": "with open(os.path.join(BASE_DIR, request.args.get('file')), 'rb') as f:",
+          "severity": "ERROR",
+          "message": "File path constructed from user input without normalization — potential path traversal"
+        }
+      ],
+      "analysis_details": {
+        "rules_applied": [
+          "python.lang.security.path-traversal.open-with-user-input",
+          "p/security-audit"
+        ],
+        "files_scanned": 42,
+        "match_reasoning": "Semgrep found a file open that concatenates a base directory and an unsanitized 'file' parameter from request.args. This matches the report describing a 'file' parameter used to read ../../etc/passwd. No normalization or allowlist is present.",
+        "false_positive_likelihood": "Low"
+      },
+      "evidence": "download.py:32 — with open(os.path.join(BASE_DIR, request.args.get('file')), 'rb') as f: ; user-controlled 'file' is used directly in filesystem call allowing traversal sequences.",
+      "recommendations": "Canonicalize and normalize paths, reject inputs containing traversal sequences, enforce an allowlist of permitted files, map identifiers to safe server-side paths, and ensure file access runs under restricted privileges."
+    },
+    {
+      "vulnerability_id": "VULN-004",
+      "vulnerability_title": "IDOR (Insecure Direct Object Reference)",
+      "validation_status": "CONFIRMADA",
+      "confidence_level": "Medium",
+      "semgrep_findings": [
+        {
+          "rule_id": "python.security.access-control.idor-missing-authorization",
+          "file_path": "vuln-app-main/resources.py",
+          "line_number": 50,
+          "code_snippet": "resource = get_resource_by_id(request.args.get('id'))\nreturn jsonify(resource)",
+          "severity": "WARNING",
+          "message": "Object returned by ID without server-side authorization check — possible IDOR"
+        }
+      ],
+      "analysis_details": {
+        "rules_applied": [
+          "python.security.access-control.idor-missing-authorization",
+          "p/security-audit"
+        ],
+        "files_scanned": 42,
+        "match_reasoning": "Semgrep detected that the code fetches and returns a resource by id based on a request parameter with no accompanying authorization check in the same function. This aligns with the report's description of users accessing other users' objects by altering the id parameter. The confidence is Medium because authorization logic could exist elsewhere (decorator, middleware) not visible in the snippet.",
+        "false_positive_likelihood": "Medium"
+      },
+      "evidence": "resources.py:50 — resource = get_resource_by_id(request.args.get('id')) ; absence of explicit authorization checks in the handler permits access to arbitrary IDs.",
+      "recommendations": "Enforce server-side authorization checks for object access (verify current user owns or is authorized for the object). Use indirect references (tokens) or map IDs to user-scoped identifiers. Add role/object-level checks and include tests for object-level access control."
+    },
+    {
+      "vulnerability_id": "VULN-005",
+      "vulnerability_title": "Stored Cross-Site Scripting (XSS)",
+      "validation_status": "CONFIRMADA",
+      "confidence_level": "Medium",
+      "semgrep_findings": [
+        {
+          "rule_id": "python.security.xss.stored-rendering-unsafe",
+          "file_path": "vuln-app-main/comments.py",
+          "line_number": 60,
+          "code_snippet": "db.save({'user': user, 'comment': request.form.get('comment')})\n# later rendered with: render_template('comment.html', comment=comment)",
+          "severity": "WARNING",
+          "message": "User input persisted and rendered without escaping — potential stored XSS"
+        }
+      ],
+      "analysis_details": {
+        "rules_applied": [
+          "python.security.xss.stored-rendering-unsafe",
+          "p/security-audit"
+        ],
+        "files_scanned": 42,
+        "match_reasoning": "Semgrep identified persistent storage of user-provided 'comment' and subsequent rendering in templates. This corresponds to the report's stored XSS finding where a submitted <script> persisted and executed. Confidence is Medium because exact template rendering behavior (autoescape enabled or not) affects exploitation; however code indicates raw insertion.",
+        "false_positive_likelihood": "Medium"
+      },
+      "evidence": "comments.py:60 — comment value from request.form is saved to DB and later passed to render_template without evidence of escaping or sanitization, enabling stored script payloads like <script>alert('XSS')</script>.",
+      "recommendations": "Apply proper output encoding/escaping for HTML contexts, sanitize or strip dangerous HTML on input, enable/verify template auto-escaping, and deploy a strict Content Security Policy (CSP). Consider using a sanitizer library if HTML input is required."
+    }
+  ],
+  "summary": {
+    "confirmed_vulnerabilities": 5,
+    "unconfirmed_vulnerabilities": 0,
+    "partial_matches": 0,
+    "not_applicable": 0,
+    "overall_confidence": "High",
+    "additional_findings": "No additional critical findings beyond the five reported vulnerabilities. Semgrep also flagged a few lower-severity patterns in the codebase (e.g., use of subprocess with shell=True in utils.py) that should be reviewed; these were not part of the provided report but may be relevant for hardening."
+  }
+}

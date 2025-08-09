@@ -1,0 +1,1 @@
+# Herramientas especializadas para el sistema de validación de vulnerabilidades

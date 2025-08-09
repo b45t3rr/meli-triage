@@ -1,0 +1,110 @@
+{
+  "document_metadata": {
+    "title": "Vulnerability Assessment Report",
+    "total_vulnerabilities": 5,
+    "extraction_date": "2025-08-09T00:00:00Z",
+    "source_file": "report.pdf"
+  },
+  "vulnerabilities": [
+    {
+      "id": "VULN-001",
+      "title": "Server-Side Request Forgery (SSRF)",
+      "description": "User-controlled URL parameter allowed the application to make arbitrary requests to internal resources. Logs show a request to an internal host that returned a sensitive flag, indicating that external input was used to initiate server-side requests to internal network endpoints.",
+      "severity": "Critical",
+      "cwe_id": "CWE-918",
+      "owasp_category": "A05 - Security Misconfiguration (SSRF)",
+      "affected_url": "http://localhost:5000/",
+      "affected_parameter": "url",
+      "http_method": "GET",
+      "evidence": "GET http://localhost:5000/?url=http://internal-host:8080/flag — Response included FLAG{ssrf_success_flag}",
+      "payload": "url=http://internal-host:8080/flag",
+      "impact": "Allows internal network reconnaissance, access to internal services, potential privilege escalation and disclosure of sensitive internal data (flag capture demonstrated).",
+      "remediation": "Validate and strictly sanitize user-supplied URLs. Implement allowlists for outbound requests (only permit approved domains/IPs), enforce DNS/IP resolution checks, block requests to internal IP ranges, and apply network segmentation and egress filtering. Use a proxy with strict rules for server-side requests.",
+      "references": [
+        "https://cwe.mitre.org/data/definitions/918.html",
+        "https://owasp.org/www-community/attacks/Server_Side_Request_Forgery",
+        "https://cheatsheetseries.owasp.org/cheatsheets/Server_Side_Request_Forgery_Prevention_Cheat_Sheet.html"
+      ]
+    },
+    {
+      "id": "VULN-002",
+      "title": "SQL Injection (Authentication Bypass)",
+      "description": "Unsanitized input in login form parameters allowed SQL injection. A crafted payload in username and password produced a successful authentication bypass as indicated by a 302 redirect and a valid session cookie.",
+      "severity": "High",
+      "cwe_id": "CWE-89",
+      "owasp_category": "A03 - Injection",
+      "affected_url": "http://localhost:5000/login",
+      "affected_parameter": "username, password",
+      "http_method": "POST",
+      "evidence": "POST /login with body: username=admin' OR '1'='1 & password=admin' OR '1'='1 resulted in HTTP/1.1 302 FOUND and session cookie issuance.",
+      "payload": "username=admin' OR '1'='1 & password=admin' OR '1'='1",
+      "impact": "Authentication bypass allowing attackers to gain unauthorized access, access user data, perform privileged actions, and potentially pivot to other systems.",
+      "remediation": "Use parameterized queries / prepared statements for all database access. Apply input validation and context-specific escaping. Enforce least-privilege database accounts and implement account lockout and multi-factor authentication for sensitive operations. Perform code review and add WAF rules to detect common SQL injection patterns.",
+      "references": [
+        "https://cwe.mitre.org/data/definitions/89.html",
+        "https://owasp.org/www-project-top-ten/2017/A1_2017-Injection.html",
+        "https://cheatsheetseries.owasp.org/cheatsheets/SQL_Injection_Prevention_Cheat_Sheet.html"
+      ]
+    },
+    {
+      "id": "VULN-003",
+      "title": "Path Traversal / Directory Traversal",
+      "description": "Application accepted manipulated file path parameters permitting traversal outside allowed directories. An attacker requested ../../etc/passwd via the file parameter and received sensitive system file contents.",
+      "severity": "High",
+      "cwe_id": "CWE-22",
+      "owasp_category": "A05 - Security Misconfiguration",
+      "affected_url": "http://localhost:5000/download",
+      "affected_parameter": "file",
+      "http_method": "GET",
+      "evidence": "GET http://localhost:5000/download?file=../../etc/passwd returned contents of system files.",
+      "payload": "file=../../etc/passwd",
+      "impact": "Exposure of sensitive filesystem data (e.g., /etc/passwd), potentially revealing usernames, system configuration and aiding further attacks or escalation.",
+      "remediation": "Normalize and canonicalize file paths on the server and reject inputs that contain traversal sequences. Enforce an allowlist of allowed files or directories, map user-supplied identifiers to server-side safe paths, and run file access under limited privileges. Do not use user-controlled input directly in filesystem calls.",
+      "references": [
+        "https://cwe.mitre.org/data/definitions/22.html",
+        "https://owasp.org/www-community/attacks/Path_Traversal",
+        "https://cheatsheetseries.owasp.org/cheatsheets/Path_Traversal_Prevention_Cheat_Sheet.html"
+      ]
+    },
+    {
+      "id": "VULN-004",
+      "title": "IDOR (Insecure Direct Object Reference)",
+      "description": "Insufficient authorization checks allowed access to objects by manipulating identifiers. The application returned objects belonging to other users when IDs were altered, indicating lack of proper access control enforcement.",
+      "severity": "Medium",
+      "cwe_id": "CWE-639",
+      "owasp_category": "A01 - Broken Access Control",
+      "affected_url": "http://localhost:5000/resource?id={id}",
+      "affected_parameter": "id",
+      "http_method": "GET",
+      "evidence": "Logs indicate users could access objects by changing the ID parameter (insecure direct object reference behavior documented in findings).",
+      "payload": "id=<other_user_id> (manipulated identifier to access another user's resource)",
+      "impact": "Unauthorized viewing of other users' data, leading to information disclosure and possible privacy compromise.",
+      "remediation": "Implement server-side authorization checks for every request to ensure the authenticated user is authorized to access the requested object. Use indirect references (tokens) instead of direct database IDs, enforce role-based access control, and apply least privilege principles; include object-level access control tests in QA.",
+      "references": [
+        "https://cwe.mitre.org/data/definitions/639.html",
+        "https://owasp.org/www-project-top-ten/2017/A5_2017-Broken_Access_Control.html",
+        "https://cheatsheetseries.owasp.org/cheatsheets/Access_Control_Cheat_Sheet.html"
+      ]
+    },
+    {
+      "id": "VULN-005",
+      "title": "Stored Cross-Site Scripting (XSS)",
+      "description": "User input persisted in application pages without proper encoding, allowing stored script injection. A submitted comment containing a <script>alert('XSS')</script> payload persisted and executed upon page load.",
+      "severity": "Low",
+      "cwe_id": "CWE-79",
+      "owasp_category": "A03 - Injection (Cross-Site Scripting)",
+      "affected_url": "http://localhost:5000/submit",
+      "affected_parameter": "comment",
+      "http_method": "POST",
+      "evidence": "POST http://localhost:5000/submit?comment=<script>alert('XSS')</script> — the script persisted and executed on page load.",
+      "payload": "comment=<script>alert('XSS')</script>",
+      "impact": "Execution of attacker-controlled JavaScript in victim browsers, enabling session theft, UI manipulation or other client-side attacks. In observed context propagation and impact were limited.",
+      "remediation": "Apply proper output encoding/escaping for HTML contexts on server-side when rendering user content. Use a Content Security Policy (CSP) to mitigate impact, perform input validation, sanitize stored content, and apply framework-provided templating protections. Consider removing or sanitizing HTML input where unnecessary.",
+      "references": [
+        "https://cwe.mitre.org/data/definitions/79.html",
+        "https://owasp.org/www-community/attacks/xss/",
+        "https://cheatsheetseries.owasp.org/cheatsheets/Cross_Site_Scripting_Prevention_Cheat_Sheet.html"
+      ]
+    }
+  ]
+}
