@@ -8,16 +8,32 @@ from crewai import Agent
 from langchain_openai import ChatOpenAI
 from typing import Dict, Any, List
 import json
+import re
+from config.llm_config import create_llm_instance
 
 class StaticAgent:
-    """Agente especializado en análisis estático de código con Semgrep"""
+    """Agente especializado en análisis estático de código usando Semgrep con análisis inteligente por LLM.
     
-    def __init__(self, semgrep_tool):
+    Este agente implementa un enfoque avanzado que:
+    1. Ejecuta un escaneo genérico completo del código fuente con Semgrep
+    2. Usa un LLM para analizar y correlacionar inteligentemente los resultados
+    3. Correlaciona hallazgos de Semgrep con vulnerabilidades reportadas
+    4. Proporciona análisis contextual y razonamiento detallado
+    
+    Características principales:
+    - Escaneo genérico con configuración automática de Semgrep
+    - Análisis inteligente por LLM para correlación de vulnerabilidades
+    - Razonamiento contextual y explicaciones detalladas
+    - Fallback automático cuando el LLM no está disponible
+    - Mayor precisión en la detección de vulnerabilidades
+    """
+    
+    def __init__(self, semgrep_tool, llm=None):
         self.semgrep_tool = semgrep_tool
-        self.llm = ChatOpenAI(
-            model="gpt-5-mini",
-            temperature=0.1
-        )
+        if llm is None:
+            self.llm = create_llm_instance("gpt-4o-mini", temperature=0.1)
+        else:
+            self.llm = llm
         
         self.agent = Agent(
             role="Especialista en Análisis Estático de Código",
@@ -45,102 +61,458 @@ class StaticAgent:
             tools=[self.semgrep_tool]
         )
     
-    def get_semgrep_rules_mapping(self) -> Dict[str, List[str]]:
-        """Mapeo de CWEs a reglas específicas de Semgrep"""
-        return {
-            "CWE-89": [  # SQL Injection
-                "python.django.security.injection.sql.django-sql-injection",
-                "python.flask.security.injection.sql.sql-injection-flask-sqlalchemy",
-                "javascript.express.security.injection.sql.express-sql-injection",
-                "java.spring.security.injection.sql.spring-sql-injection",
-                "php.lang.security.injection.sql.sql-injection",
-                "generic.secrets.security.detected-sql-injection"
-            ],
-            "CWE-79": [  # XSS
-                "python.django.security.injection.xss.django-xss",
-                "python.flask.security.injection.xss.flask-xss",
-                "javascript.express.security.injection.xss.express-xss",
-                "java.spring.security.injection.xss.spring-xss",
-                "php.lang.security.injection.xss.xss",
-                "typescript.react.security.injection.xss.react-xss"
-            ],
-            "CWE-352": [  # CSRF
-                "python.django.security.csrf.django-csrf-disabled",
-                "python.flask.security.csrf.flask-csrf-disabled",
-                "javascript.express.security.csrf.express-csrf-disabled",
-                "java.spring.security.csrf.spring-csrf-disabled"
-            ],
-            "CWE-22": [  # Path Traversal
-                "python.lang.security.traversal.path-traversal",
-                "javascript.lang.security.traversal.path-traversal",
-                "java.lang.security.traversal.path-traversal",
-                "php.lang.security.traversal.path-traversal",
-                "generic.secrets.security.detected-path-traversal"
-            ],
-            "CWE-78": [  # Command Injection
-                "python.lang.security.injection.command.command-injection",
-                "javascript.lang.security.injection.command.command-injection",
-                "java.lang.security.injection.command.command-injection",
-                "php.lang.security.injection.command.command-injection",
-                "bash.lang.security.injection.command.command-injection"
-            ],
-            "CWE-94": [  # Code Injection
-                "python.lang.security.injection.code.code-injection",
-                "javascript.lang.security.injection.code.code-injection",
-                "java.lang.security.injection.code.code-injection",
-                "php.lang.security.injection.code.code-injection"
-            ],
-            "CWE-98": [  # File Inclusion
-                "php.lang.security.inclusion.file-inclusion",
-                "python.lang.security.inclusion.file-inclusion",
-                "javascript.lang.security.inclusion.file-inclusion"
-            ],
-            "CWE-200": [  # Information Disclosure
-                "generic.secrets.security.detected-private-key",
-                "generic.secrets.security.detected-password",
-                "python.lang.security.disclosure.information-disclosure",
-                "javascript.lang.security.disclosure.information-disclosure",
-                "java.lang.security.disclosure.information-disclosure"
-            ],
-            "CWE-287": [  # Authentication Bypass
-                "python.django.security.auth.django-auth-bypass",
-                "python.flask.security.auth.flask-auth-bypass",
-                "javascript.express.security.auth.express-auth-bypass",
-                "java.spring.security.auth.spring-auth-bypass"
-            ],
-            "CWE-327": [  # Weak Cryptography
-                "python.lang.security.crypto.weak-crypto",
-                "javascript.lang.security.crypto.weak-crypto",
-                "java.lang.security.crypto.weak-crypto",
-                "php.lang.security.crypto.weak-crypto",
-                "generic.secrets.security.detected-weak-crypto"
-            ],
-            "CWE-319": [  # Insecure Transport
-                "python.lang.security.transport.insecure-transport",
-                "javascript.lang.security.transport.insecure-transport",
-                "java.lang.security.transport.insecure-transport",
-                "generic.secrets.security.detected-insecure-transport"
-            ],
-            "CWE-601": [  # Open Redirect
-                "python.django.security.redirect.django-open-redirect",
-                "python.flask.security.redirect.flask-open-redirect",
-                "javascript.express.security.redirect.express-open-redirect",
-                "java.spring.security.redirect.spring-open-redirect"
-            ],
-            "CWE-798": [  # Hardcoded Credentials
-                "generic.secrets.security.detected-hardcoded-password",
-                "generic.secrets.security.detected-hardcoded-key",
-                "python.lang.security.hardcoded.hardcoded-credentials",
-                "javascript.lang.security.hardcoded.hardcoded-credentials",
-                "java.lang.security.hardcoded.hardcoded-credentials"
-            ],
-            "CWE-20": [  # Input Validation
-                "python.lang.security.validation.input-validation",
-                "javascript.lang.security.validation.input-validation",
-                "java.lang.security.validation.input-validation",
-                "php.lang.security.validation.input-validation"
-            ]
+    def perform_generic_scan(self, target_path: str) -> Dict[str, Any]:
+        """Ejecuta un escaneo genérico con Semgrep usando configuración automática"""
+        try:
+            # Ejecutar escaneo genérico con configuración automática
+            scan_result = self.semgrep_tool.get_raw_results(
+                target_path=target_path,
+                config="auto",  # Configuración automática para detectar múltiples tipos de vulnerabilidades
+                rules=None,
+                language=None,
+                severity=None,
+                exclude_patterns=["*.git*", "*.log", "*.tmp", "node_modules/*", "venv/*", "__pycache__/*"]
+            )
+            
+            # Verificar si hay errores en el resultado
+            if "error" in scan_result:
+                return {"success": False, "error": scan_result["error"]}
+            
+            return {"success": True, "results": scan_result}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+    
+    def perform_targeted_scan(self, target_path: str, reported_vulnerabilities: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Ejecuta un escaneo dirigido generando reglas dinámicamente basándose en las vulnerabilidades reportadas"""
+        try:
+            # Generar reglas dinámicas basadas en las vulnerabilidades reportadas
+            dynamic_rules = self._generate_dynamic_rules(reported_vulnerabilities, target_path)
+            
+            # Ejecutar escaneo con reglas dinámicas
+            scan_result = self.semgrep_tool.get_raw_results(
+                target_path=target_path,
+                config="auto",  # Mantener configuración automática como base
+                rules=dynamic_rules if dynamic_rules else None,
+                language=None,
+                severity=None,
+                exclude_patterns=["*.git*", "*.log", "*.tmp", "node_modules/*", "venv/*", "__pycache__/*"]
+            )
+            
+            # Verificar si hay errores en el resultado
+            if "error" in scan_result:
+                return {"success": False, "error": scan_result["error"]}
+            
+            return {"success": True, "results": scan_result, "dynamic_rules_used": dynamic_rules}
+        except Exception as e:
+            return {"success": False, "error": str(e)}
+    
+    def analyze_vulnerabilities_with_llm(self, semgrep_results: Dict[str, Any], reported_vulnerabilities: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Usa el LLM para analizar y correlacionar los resultados de Semgrep con las vulnerabilidades reportadas"""
+        try:
+            # Preparar el prompt para el LLM
+            semgrep_findings = semgrep_results.get('results', [])
+            
+            analysis_prompt = f"""
+            Eres un experto en análisis de seguridad. Tu tarea es correlacionar los hallazgos de Semgrep con las vulnerabilidades reportadas.
+            
+            VULNERABILIDADES REPORTADAS:
+            {json.dumps(reported_vulnerabilities, indent=2)}
+            
+            HALLAZGOS DE SEMGREP:
+            {json.dumps(semgrep_findings, indent=2)}
+            
+            Para cada vulnerabilidad reportada, analiza si existe evidencia en los hallazgos de Semgrep que la confirme.
+            Considera:
+            1. Tipos de vulnerabilidad similares (ej: path traversal, directory traversal)
+            2. Ubicaciones de archivos mencionadas
+            3. Patrones de código que coincidan
+            4. Funciones o métodos específicos
+            5. Parámetros o variables mencionadas
+            
+            Retorna un JSON con la siguiente estructura:
+            {{
+                "correlations": [
+                    {{
+                        "vulnerability_id": "string",
+                        "vulnerability_title": "string",
+                        "status": "CONFIRMADA|NO_CONFIRMADA|PARCIAL",
+                        "confidence": "High|Medium|Low",
+                        "matching_findings": [
+                            {{
+                                "rule_id": "string",
+                                "file_path": "string",
+                                "line_number": "number",
+                                "code_snippet": "string",
+                                "message": "string",
+                                "severity": "string",
+                                "match_reason": "string"
+                            }}
+                        ],
+                        "reasoning": "string explicando por qué se considera confirmada/no confirmada"
+                    }}
+                ]
+            }}
+            """
+            
+            # Usar el LLM para analizar
+            if hasattr(self, 'llm') and self.llm:
+                response = self.llm.invoke(analysis_prompt)
+                try:
+                    # Intentar parsear la respuesta como JSON
+                    if hasattr(response, 'content'):
+                        result = json.loads(response.content)
+                    else:
+                        result = json.loads(str(response))
+                    return result
+                except json.JSONDecodeError:
+                    # Si no es JSON válido, retornar la respuesta como texto
+                    return {"analysis_text": str(response), "error": "LLM response was not valid JSON"}
+            else:
+                # Fallback al método anterior si no hay LLM disponible
+                return self._fallback_correlation(semgrep_results, reported_vulnerabilities)
+                
+        except Exception as e:
+            return {"error": f"Error en análisis con LLM: {str(e)}"}
+    
+    def _generate_dynamic_rules(self, reported_vulnerabilities: List[Dict[str, Any]], target_path: str) -> List[str]:
+        """Genera reglas de Semgrep dinámicamente usando LLM basándose en las vulnerabilidades reportadas"""
+        import os
+        
+        dynamic_rules = []
+        print(f"[DEBUG] Generando reglas dinámicas con LLM para {len(reported_vulnerabilities)} vulnerabilidades")
+        print(f"[DEBUG] Target path: {target_path}")
+        
+        # Generar reglas para cada vulnerabilidad reportada usando LLM
+        for vuln in reported_vulnerabilities:
+            vuln_id = vuln.get('id', 'unknown')
+            vuln_title = vuln.get('title', '')
+            vuln_description = vuln.get('description', '')
+            vuln_evidence = vuln.get('evidence', '')
+            original_severity = vuln.get('severity', 'Medium').upper()
+            
+            print(f"[DEBUG] Procesando vulnerabilidad: {vuln_id} - {vuln_title}")
+            
+            # Generar regla usando LLM
+            rule_content = self._generate_rule_with_llm(
+                vuln_id=vuln_id,
+                title=vuln_title,
+                description=vuln_description,
+                evidence=vuln_evidence,
+                severity=original_severity
+            )
+            
+            if rule_content:
+                # Guardar regla en archivo temporal
+                rule_file = os.path.join(target_path, f"dynamic_rule_{vuln_id}.yaml")
+                print(f"[DEBUG] Guardando regla generada por LLM en: {rule_file}")
+                try:
+                    with open(rule_file, 'w') as f:
+                        f.write(rule_content)
+                    dynamic_rules.append(rule_file)
+                except Exception as e:
+                    print(f"[ERROR] No se pudo guardar la regla para {vuln_id}: {str(e)}")
+            else:
+                print(f"[WARNING] No se pudo generar regla para vulnerabilidad {vuln_id}")
+        
+        print(f"[DEBUG] Total de reglas dinámicas generadas: {len(dynamic_rules)}")
+        return dynamic_rules
+    
+    def _generate_rule_with_llm(self, vuln_id: str, title: str, description: str, evidence: str, severity: str) -> str:
+        """Genera una regla de Semgrep usando LLM basándose en la información de la vulnerabilidad"""
+        try:
+            if not hasattr(self, 'llm') or not self.llm:
+                print(f"[WARNING] LLM no disponible para generar regla de {vuln_id}")
+                return None
+            
+            # Convertir severidad al formato Semgrep
+            semgrep_severity = self._convert_severity_to_semgrep(severity)
+            
+            # Crear prompt para generar la regla
+            rule_generation_prompt = f"""
+            Eres un experto en análisis de seguridad y creación de reglas de Semgrep. Tu tarea es generar una regla YAML de Semgrep específica para detectar la siguiente vulnerabilidad:
+            
+            INFORMACIÓN DE LA VULNERABILIDAD:
+            - ID: {vuln_id}
+            - Título: {title}
+            - Descripción: {description}
+            - Evidencia: {evidence}
+            - Severidad: {severity}
+            
+            INSTRUCCIONES:
+            1. Analiza la información proporcionada para entender el tipo de vulnerabilidad
+            2. Identifica los patrones de código que podrían indicar esta vulnerabilidad
+            3. Genera una regla YAML de Semgrep válida y específica
+            4. Incluye patrones positivos (pattern) y negativos (pattern-not) cuando sea apropiado
+            5. Asigna un CWE apropiado basado en el tipo de vulnerabilidad
+            6. Usa el lenguaje de programación más apropiado (python, javascript, java, etc.)
+            
+            FORMATO DE SALIDA:
+            Retorna ÚNICAMENTE el contenido YAML de la regla, sin explicaciones adicionales.
+            
+            EJEMPLO DE ESTRUCTURA:
+            ```yaml
+            rules:
+              - id: dynamic-{vuln_id}
+                patterns:
+                  - pattern: [patrón específico basado en la vulnerabilidad]
+                  - pattern-not: [patrón de exclusión si es necesario]
+                message: |
+                  [Mensaje descriptivo de la vulnerabilidad detectada]
+                languages: [lenguaje apropiado]
+                severity: {semgrep_severity}
+                metadata:
+                  category: security
+                  cwe:
+                    - "[CWE apropiado]"
+                  confidence: HIGH
+                  likelihood: HIGH
+                  impact: HIGH
+                  subcategory:
+                    - vuln
+            ```
+            
+            Genera la regla ahora:
+            """
+            
+            # Usar el LLM para generar la regla
+            response = self.llm.invoke(rule_generation_prompt)
+            
+            # Extraer el contenido de la respuesta
+            if hasattr(response, 'content'):
+                rule_content = response.content
+            else:
+                rule_content = str(response)
+            
+            # Limpiar la respuesta para extraer solo el YAML
+            rule_content = self._clean_yaml_response(rule_content)
+            
+            if rule_content and self._validate_yaml_rule(rule_content):
+                print(f"[DEBUG] Regla generada exitosamente para {vuln_id}")
+                return rule_content
+            else:
+                print(f"[ERROR] Regla generada inválida para {vuln_id}")
+                return None
+                
+        except Exception as e:
+            print(f"[ERROR] Error generando regla con LLM para {vuln_id}: {str(e)}")
+            return None
+    
+    def _clean_yaml_response(self, response: str) -> str:
+        """Limpia la respuesta del LLM para extraer solo el contenido YAML válido"""
+        try:
+            # Buscar bloques de código YAML
+            import re
+            
+            # Buscar contenido entre ```yaml y ``` o ```yml y ```
+            yaml_pattern = r'```(?:yaml|yml)\s*\n(.*?)\n```'
+            match = re.search(yaml_pattern, response, re.DOTALL | re.IGNORECASE)
+            
+            if match:
+                return match.group(1).strip()
+            
+            # Si no hay bloques de código, buscar contenido que empiece con 'rules:'
+            rules_pattern = r'(rules:\s*\n.*?)(?=\n\n|$)'
+            match = re.search(rules_pattern, response, re.DOTALL)
+            
+            if match:
+                return match.group(1).strip()
+            
+            # Como último recurso, retornar la respuesta completa limpia
+            lines = response.strip().split('\n')
+            yaml_lines = []
+            in_yaml = False
+            
+            for line in lines:
+                if line.strip().startswith('rules:'):
+                    in_yaml = True
+                if in_yaml:
+                    yaml_lines.append(line)
+            
+            return '\n'.join(yaml_lines) if yaml_lines else response.strip()
+            
+        except Exception as e:
+            print(f"[ERROR] Error limpiando respuesta YAML: {str(e)}")
+            return response.strip()
+    
+    def _validate_yaml_rule(self, yaml_content: str) -> bool:
+        """Valida que el contenido YAML sea una regla de Semgrep válida"""
+        try:
+            import yaml
+            
+            # Intentar parsear el YAML
+            parsed = yaml.safe_load(yaml_content)
+            
+            # Verificar estructura básica
+            if not isinstance(parsed, dict):
+                return False
+            
+            if 'rules' not in parsed:
+                return False
+            
+            rules = parsed['rules']
+            if not isinstance(rules, list) or len(rules) == 0:
+                return False
+            
+            # Verificar que cada regla tenga los campos mínimos requeridos
+            for rule in rules:
+                if not isinstance(rule, dict):
+                    return False
+                
+                required_fields = ['id', 'message', 'languages', 'severity']
+                for field in required_fields:
+                    if field not in rule:
+                        return False
+                
+                # Verificar que tenga al menos un patrón
+                if 'patterns' not in rule and 'pattern' not in rule:
+                    return False
+            
+            return True
+            
+        except Exception as e:
+            print(f"[ERROR] Error validando YAML: {str(e)}")
+            return False
+    
+    def _convert_severity_to_semgrep(self, original_severity: str) -> str:
+        """Convierte la severidad del reporte al formato de Semgrep"""
+        severity_mapping = {
+            'CRITICAL': 'ERROR',
+            'HIGH': 'ERROR', 
+            'MEDIUM': 'WARNING',
+            'LOW': 'INFO',
+            'INFORMATIONAL': 'INFO'
         }
+        return severity_mapping.get(original_severity, 'WARNING')
+    
+
+    
+    def _fallback_correlation(self, semgrep_results: Dict[str, Any], reported_vulnerabilities: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Método de fallback mejorado para correlación cuando el LLM no está disponible"""
+        try:
+            correlations = []
+            semgrep_findings = semgrep_results.get('results', [])
+            
+            # Mapeo de palabras clave para diferentes tipos de vulnerabilidades
+            vulnerability_keywords = {
+                'path_traversal': ['path', 'traversal', 'directory', 'file', 'filename', '../', '..\\'],
+                'sql_injection': ['sql', 'injection', 'query', 'execute', 'cursor', 'database'],
+                'xss': ['xss', 'script', 'html', 'render', 'template', 'markup', 'escape'],
+                'ssrf': ['ssrf', 'request', 'url', 'http', 'fetch', 'curl', 'urllib'],
+                'idor': ['idor', 'authorization', 'access', 'permission', 'user', 'id', 'object'],
+                'csrf': ['csrf', 'token', 'form', 'post', 'session'],
+                'deserialization': ['deserialize', 'pickle', 'serialize', 'marshal', 'unmarshal'],
+                'command_injection': ['command', 'exec', 'system', 'shell', 'subprocess', 'os.system'],
+                'ldap_injection': ['ldap', 'directory', 'bind', 'search', 'filter'],
+                'xxe': ['xml', 'entity', 'external', 'dtd', 'parser']
+            }
+            
+            for vuln in reported_vulnerabilities:
+                correlation = {
+                    "vulnerability_id": vuln.get('id', 'unknown'),
+                    "vulnerability_title": vuln.get('title', vuln.get('name', 'Unknown')),
+                    "status": "NO_CONFIRMADA",
+                    "confidence": "Low",
+                    "matching_findings": [],
+                    "reasoning": "Análisis automático con correlación por palabras clave - se recomienda revisión manual"
+                }
+                
+                # Texto completo de la vulnerabilidad para análisis
+                vuln_text = f"{vuln.get('title', '')} {vuln.get('description', '')} {vuln.get('evidence', '')}".lower()
+                
+                # Determinar el tipo de vulnerabilidad más probable
+                detected_vuln_types = []
+                for vuln_type, keywords in vulnerability_keywords.items():
+                    if any(keyword in vuln_text for keyword in keywords):
+                        detected_vuln_types.append(vuln_type)
+                
+                # Buscar coincidencias en los hallazgos de Semgrep
+                for finding in semgrep_findings:
+                    finding_text = f"{finding.get('message', '')} {finding.get('check_id', '')} {finding.get('path', '')}".lower()
+                    
+                    # Calcular score de coincidencia
+                    match_score = 0
+                    match_reasons = []
+                    
+                    # Verificar coincidencias por tipo de vulnerabilidad
+                    for vuln_type in detected_vuln_types:
+                        keywords = vulnerability_keywords[vuln_type]
+                        vuln_matches = sum(1 for keyword in keywords if keyword in vuln_text)
+                        finding_matches = sum(1 for keyword in keywords if keyword in finding_text)
+                        
+                        if vuln_matches > 0 and finding_matches > 0:
+                            match_score += (vuln_matches + finding_matches)
+                            match_reasons.append(f"Coincidencia en {vuln_type}")
+                    
+                    # Verificar coincidencias de archivos específicos
+                    if vuln.get('evidence', ''):
+                        evidence_files = self._extract_file_paths(vuln.get('evidence', ''))
+                        finding_file = finding.get('path', '')
+                        for evidence_file in evidence_files:
+                            if evidence_file in finding_file or finding_file.endswith(evidence_file):
+                                match_score += 5
+                                match_reasons.append(f"Coincidencia de archivo: {evidence_file}")
+                    
+                    # Si hay suficiente score de coincidencia, agregar el hallazgo
+                    if match_score >= 2:
+                        correlation["matching_findings"].append({
+                            "rule_id": finding.get('check_id', ''),
+                            "file_path": finding.get('path', ''),
+                            "line_number": finding.get('start', {}).get('line', 0),
+                            "code_snippet": finding.get('extra', {}).get('lines', ''),
+                            "message": finding.get('message', ''),
+                            "severity": finding.get('extra', {}).get('severity', 'INFO'),
+                            "match_reason": "; ".join(match_reasons),
+                            "match_score": match_score
+                        })
+                        
+                        # Actualizar status y confianza basado en el score
+                        if match_score >= 5:
+                            correlation["status"] = "CONFIRMADA"
+                            correlation["confidence"] = "High"
+                        elif match_score >= 3:
+                            correlation["status"] = "PARCIAL"
+                            correlation["confidence"] = "Medium"
+                        else:
+                            correlation["status"] = "PARCIAL"
+                            correlation["confidence"] = "Low"
+                
+                # Actualizar reasoning basado en los resultados
+                if correlation["matching_findings"]:
+                    correlation["reasoning"] = f"Se encontraron {len(correlation['matching_findings'])} hallazgos correlacionados. Tipos detectados: {', '.join(detected_vuln_types)}"
+                else:
+                    correlation["reasoning"] = f"No se encontraron hallazgos correlacionados. Tipos detectados: {', '.join(detected_vuln_types) if detected_vuln_types else 'Ninguno'}"
+                
+                correlations.append(correlation)
+            
+            return {"correlations": correlations}
+            
+        except Exception as e:
+            return {"error": f"Error en correlación de fallback: {str(e)}"}
+    
+    def _extract_file_paths(self, text: str) -> List[str]:
+        """Extrae rutas de archivos del texto de evidencia"""
+        import re
+        
+        # Patrones para detectar rutas de archivos
+        file_patterns = [
+            r'[\w\-_./\\]+\.[a-zA-Z]{2,4}',  # archivos con extensión
+            r'/[\w\-_./]+',  # rutas Unix
+            r'[A-Za-z]:\\[\w\-_.\\]+',  # rutas Windows
+        ]
+        
+        file_paths = []
+        for pattern in file_patterns:
+            matches = re.findall(pattern, text)
+            file_paths.extend(matches)
+        
+        # Limpiar y filtrar rutas válidas
+        cleaned_paths = []
+        for path in file_paths:
+            # Filtrar rutas muy cortas o que parezcan URLs
+            if len(path) > 3 and not path.startswith('http') and not path.startswith('www'):
+                cleaned_paths.append(path.strip())
+        
+        return list(set(cleaned_paths))  # Eliminar duplicados
     
     def get_language_detection_patterns(self) -> Dict[str, List[str]]:
         """Patrones para detectar lenguajes de programación en el directorio"""
@@ -203,22 +575,33 @@ class StaticAgent:
         }
     
     def get_semgrep_command_templates(self) -> Dict[str, str]:
-        """Templates de comandos Semgrep para diferentes escenarios"""
+        """Templates de comandos Semgrep para el enfoque dinámico"""
         return {
+            "generic_scan": "semgrep --config=auto --json --verbose",
             "comprehensive": "semgrep --config=auto --json --verbose",
             "security_focused": "semgrep --config=p/security-audit --json --verbose",
             "owasp_top10": "semgrep --config=p/owasp-top-ten --json --verbose",
-            "cwe_specific": "semgrep --config=p/cwe-top-25 --json --verbose",
-            "language_specific": "semgrep --config=p/{language} --json --verbose",
-            "custom_rules": "semgrep --config={custom_rules_path} --json --verbose"
+            "language_specific": "semgrep --config=p/{language} --json --verbose"
         }
     
     def get_correlation_strategies(self) -> Dict[str, str]:
-        """Estrategias para correlacionar hallazgos de Semgrep con vulnerabilidades reportadas"""
+        """Estrategias de correlación entre hallazgos y vulnerabilidades reportadas"""
         return {
-            "exact_match": "Coincidencia exacta de CWE y ubicación",
-            "pattern_match": "Coincidencia de patrones de vulnerabilidad",
-            "semantic_match": "Coincidencia semántica basada en descripción",
-            "location_proximity": "Proximidad de ubicación en archivos similares",
-            "code_context": "Análisis del contexto del código circundante"
+            "llm_analysis": "Análisis inteligente por LLM para correlación contextual",
+            "semantic_matching": "Coincidencia semántica entre tipos de vulnerabilidad",
+            "code_pattern_analysis": "Análisis de patrones de código y funciones",
+            "location_correlation": "Correlación por ubicación de archivos y líneas",
+            "evidence_matching": "Coincidencia con evidencia específica del reporte",
+            "contextual_reasoning": "Razonamiento contextual y explicaciones detalladas"
+        }
+    
+    def get_dynamic_analysis_workflow(self) -> Dict[str, str]:
+        """Flujo de trabajo para análisis dinámico con LLM"""
+        return {
+            "step_1": "Ejecutar escaneo genérico completo con Semgrep usando config=auto",
+            "step_2": "Preparar contexto con vulnerabilidades reportadas y hallazgos de Semgrep",
+            "step_3": "Usar LLM para análisis inteligente y correlación contextual",
+            "step_4": "Generar correlaciones con razonamiento detallado por cada vulnerabilidad",
+            "step_5": "Aplicar fallback automático si el LLM no está disponible",
+            "step_6": "Retornar análisis estructurado con evidencia y explicaciones"
         }

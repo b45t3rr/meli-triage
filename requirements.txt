@@ -5,6 +5,17 @@ langchain
 langchain-openai
 openai
 
+# Proveedores de LLM adicionales
+langchain-anthropic
+langchain-google-genai
+langchain-xai
+langchain-deepseek
+langchain-groq
+langchain-mistralai
+# langchain-xai  # Comentado hasta que esté disponible oficialmente
+anthropic
+google-generativeai
+
 # Herramientas de análisis
 PyPDF2
 semgrep
@@ -36,3 +47,6 @@ PyYAML
 
 # Fecha/Tiempo
 python-dateutil
+
+# Base de datos
+pymongo

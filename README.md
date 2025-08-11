@@ -2,6 +2,28 @@
 
 Sistema GenIA que utiliza un framework de agentes (CrewAI) para validar vulnerabilidades de reportes PDF mediante análisis estático y dinámico.
 
+## 🤖 Soporte Multi-LLM
+
+El sistema soporta múltiples proveedores de modelos LLM:
+- **OpenAI**: GPT-4o, GPT-4o-mini, GPT-4, O1, etc.
+- **Anthropic**: Claude 3.5 Sonnet, Claude 3.5 Haiku, Claude 3 Opus
+- **Google**: Gemini 2.5 Flash, Gemini 1.5 Pro/Flash
+- **DeepSeek**: DeepSeek Chat, DeepSeek Coder, DeepSeek Reasoner
+- **Groq**: Llama 3.3, Llama 3.1, Mixtral, Gemma2
+- **Mistral**: Mistral Large/Medium/Small, Open-Mistral
+- **xAI**: Grok Beta, Grok 2/2-mini (próximamente)
+
+```bash
+# Ver modelos disponibles
+python main.py --list-models
+
+# Usar modelo específico
+python main.py --model gpt-4o-mini --pdf report.pdf --source ./code --url https://example.com
+python main.py --model anthropic:claude-3-5-sonnet-20241022 --pdf report.pdf --extract-only
+```
+
+📖 **Documentación completa**: [README_LLM.md](README_LLM.md)
+
 ## 🏗️ Arquitectura
 
 El sistema está compuesto por 4 agentes especializados:
@@ -110,26 +132,51 @@ export OPENAI_API_KEY="tu-api-key-aqui"
 ### Ejecución con Argumentos (Recomendado)
 
 ```bash
-# Uso básico
+# Uso básico (análisis completo)
 python main.py --pdf reporte.pdf --source ./codigo --url https://ejemplo.com
 
 # Con argumentos cortos
 python main.py -p vuln_report.pdf -s /ruta/al/codigo -u http://localhost:8080
+
+# Solo extracción de PDF
+python main.py --pdf report.pdf --extract-only
+
+# Solo análisis estático
+python main.py --pdf report.pdf --source ./codigo --static-only
+
+# Solo análisis dinámico
+python main.py --pdf report.pdf --url https://ejemplo.com --dynamic-only
 
 # Especificando directorio de salida
 python main.py --pdf report.pdf --source ./src --url https://app.com --output ./mis_resultados
 
 # Con API key como argumento
 python main.py --pdf report.pdf --source ./src --url https://app.com --api-key tu-openai-key
+
+# Guardar resultados en archivos JSON
+python main.py --pdf report.pdf --source ./src --url https://app.com --save-output
 ```
 
 ### Argumentos Disponibles
 
+**Argumentos principales:**
 - `-p, --pdf` (requerido): Ruta al archivo PDF del reporte
-- `-s, --source` (requerido): Directorio del código fuente
-- `-u, --url` (requerido): URL objetivo para pruebas dinámicas
+- `-s, --source`: Directorio del código fuente (requerido para análisis estático)
+- `-u, --url`: URL objetivo para pruebas dinámicas (requerido para análisis dinámico)
 - `-o, --output` (opcional): Directorio de salida (default: ./results)
+- `--model` (opcional): Modelo LLM a usar (default: gpt-4o-mini)
 - `--api-key` (opcional): OpenAI API Key
+
+**Modos de ejecución:**
+- `--extract-only`: Ejecutar solo extracción de PDF
+- `--static-only`: Ejecutar solo análisis estático (requiere --source)
+- `--dynamic-only`: Ejecutar solo análisis dinámico (requiere --url)
+- Sin modo específico: Ejecutar análisis completo (requiere --source y --url)
+
+**Opciones adicionales:**
+- `--save-output`: Guardar resultados en archivos JSON
+- `--list-models`: Mostrar modelos LLM disponibles
+- `--help`: Mostrar ayuda completa
 
 ### Ver Ayuda
 

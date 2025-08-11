@@ -9,15 +9,16 @@ from langchain_openai import ChatOpenAI
 from typing import Dict, Any, List
 import json
 from datetime import datetime
+from config.llm_config import create_llm_instance
 
 class TriageAgent:
     """Agente especializado en consolidación y triage de resultados de seguridad"""
     
-    def __init__(self):
-        self.llm = ChatOpenAI(
-            model="gpt-5-mini",
-            temperature=0.1
-        )
+    def __init__(self, llm=None):
+        if llm is None:
+            self.llm = create_llm_instance("gpt-4o-mini", temperature=0.1)
+        else:
+            self.llm = llm
         
         self.agent = Agent(
             role="Especialista en Triage de Seguridad y Análisis de Riesgo",
@@ -270,9 +271,27 @@ class TriageAgent:
                     "owasp_category": "string",
                     "evidence_summary": {
                         "static_analysis": {
-                            "status": "string",
+                            "status": "CONFIRMADA|NO_CONFIRMADA|PARCIAL",
+                            "confidence": "High|Medium|Low",
                             "findings_count": "int",
-                            "key_evidence": ["string"]
+                            "findings_summary": "string - Resumen detallado de los hallazgos",
+                            "code_evidence": [
+                                {
+                                    "file_path": "string - Ruta del archivo vulnerable",
+                                    "line_number": "int - Número de línea",
+                                    "code_snippet": "string - Fragmento de código vulnerable",
+                                    "vulnerability_pattern": "string - Patrón de vulnerabilidad detectado",
+                                    "rule_id": "string - ID de la regla que detectó el problema",
+                                    "severity": "string - Severidad del hallazgo",
+                                    "description": "string - Descripción del problema específico"
+                                }
+                            ],
+                            "technical_details": {
+                                "total_findings": "int - Total de hallazgos encontrados",
+                                "files_affected": "int - Archivos afectados",
+                                "vulnerability_types": ["string - Tipos de vulnerabilidades detectadas"],
+                                "semgrep_rules_matched": ["string - Reglas de Semgrep que coincidieron"]
+                            }
                         },
                         "dynamic_analysis": {
                             "status": "string",

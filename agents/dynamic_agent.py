@@ -8,16 +8,17 @@ from crewai import Agent
 from langchain_openai import ChatOpenAI
 from typing import Dict, Any, List
 import json
+from config.llm_config import create_llm_instance
 
 class DynamicAgent:
     """Agente especializado en análisis dinámico con Nuclei"""
     
-    def __init__(self, nuclei_tool):
+    def __init__(self, nuclei_tool, llm=None):
         self.nuclei_tool = nuclei_tool
-        self.llm = ChatOpenAI(
-            model="gpt-5-mini",
-            temperature=0.1
-        )
+        if llm is None:
+            self.llm = create_llm_instance("gpt-4o-mini", temperature=0.1)
+        else:
+            self.llm = llm
         
         self.agent = Agent(
             role="Especialista en Análisis Dinámico y Penetration Testing",

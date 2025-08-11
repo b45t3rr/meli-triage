@@ -11,7 +11,7 @@ class TriageTask:
     """Tarea para consolidar resultados y generar reporte final"""
     
     @staticmethod
-    def create_task(agent, extracted_vulnerabilities: str, static_results: str, dynamic_results: str) -> Task:
+    def create_task(agent, extracted_vulnerabilities: str, static_results: str, dynamic_results: str, analysis_type: str = "full") -> Task:
         """Crea la tarea de triage"""
         
         description = f"""
@@ -30,9 +30,11 @@ class TriageTask:
         1. Correlacionar todos los resultados de los diferentes análisis
         2. Para cada vulnerabilidad del reporte original:
            - Determinar el estado final de validación
-           - Consolidar evidencia de múltiples fuentes
+           - Consolidar evidencia de múltiples fuentes incluyendo snippets de código específicos
+           - Extraer y documentar fragmentos de código vulnerables encontrados
+           - Incluir ubicaciones exactas (archivos y líneas) de los problemas detectados
            - Reclasificar severidad si es necesario
-           - Evaluar el riesgo real basado en evidencia
+           - Evaluar el riesgo real basado en evidencia técnica concreta
         
         3. Aplicar criterios de triage para determinar el estado final:
            - CONFIRMADA: Evidencia sólida de múltiples fuentes
@@ -58,6 +60,17 @@ class TriageTask:
            - Incluir pruebas de concepto
            - Documentar indicadores técnicos
         
+        INSTRUCCIONES ESPECÍFICAS PARA LA EVIDENCIA:
+        - Para cada vulnerabilidad confirmada o parcial, DEBES incluir:
+          * Fragmentos exactos del código vulnerable encontrado
+          * Rutas completas de archivos y números de línea específicos
+          * Descripción técnica del patrón de vulnerabilidad detectado
+          * ID de las reglas de Semgrep que detectaron el problema
+          * Contexto del código circundante cuando sea relevante
+        - La evidencia debe ser lo suficientemente detallada para que un desarrollador
+          pueda localizar y entender exactamente el problema sin necesidad de
+          herramientas adicionales
+        
         Usa tu experiencia en triage de seguridad para:
         - Evaluar la credibilidad de diferentes tipos de evidencia
         - Priorizar vulnerabilidades por riesgo real
@@ -67,17 +80,95 @@ class TriageTask:
         IMPORTANTE: Retorna ÚNICAMENTE un JSON válido con la estructura especificada.
         """
         
-        expected_output = """
+        # Ajustar el expected_output según el tipo de análisis
+        validation_evidence_section = ""
+        tools_effectiveness_section = ""
+        
+        if analysis_type == "static_only":
+            validation_evidence_section = '''
+                    "validation_evidence": {
+                        "static_analysis": {
+                            "status": "CONFIRMADA|NO_CONFIRMADA|PARCIAL",
+                            "confidence": "High|Medium|Low",
+                            "findings_summary": "string - Resumen detallado de los hallazgos",
+                            "code_evidence": [
+                                {
+                                    "file_path": "string - Ruta del archivo vulnerable",
+                                    "line_number": "number - Número de línea",
+                                    "code_snippet": "string - Fragmento de código vulnerable",
+                                    "vulnerability_pattern": "string - Patrón de vulnerabilidad detectado",
+                                    "rule_id": "string - ID de la regla que detectó el problema",
+                                    "severity": "string - Severidad del hallazgo",
+                                    "description": "string - Descripción del problema específico"
+                                }
+                            ],
+                            "technical_details": {
+                                "total_findings": "number - Total de hallazgos encontrados",
+                                "files_affected": "number - Archivos afectados",
+                                "vulnerability_types": ["string - Tipos de vulnerabilidades detectadas"],
+                                "semgrep_rules_matched": ["string - Reglas de Semgrep que coincidieron"]
+                            }
+                        },
+                        "combined_assessment": "string"
+                    },'''
+            tools_effectiveness_section = '''                    "static_analysis": "number"'''
+        elif analysis_type == "dynamic_only":
+            validation_evidence_section = '''
+                    "validation_evidence": {
+                        "dynamic_analysis": {
+                            "status": "string",
+                            "evidence": "string",
+                            "confidence": "string"
+                        },
+                        "combined_assessment": "string"
+                    },'''
+            tools_effectiveness_section = '''                    "dynamic_analysis": "number"'''
+        else:  # full analysis
+            validation_evidence_section = '''
+                    "validation_evidence": {
+                        "static_analysis": {
+                            "status": "CONFIRMADA|NO_CONFIRMADA|PARCIAL",
+                            "confidence": "High|Medium|Low",
+                            "findings_summary": "string - Resumen detallado de los hallazgos",
+                            "code_evidence": [
+                                {
+                                    "file_path": "string - Ruta del archivo vulnerable",
+                                    "line_number": "number - Número de línea",
+                                    "code_snippet": "string - Fragmento de código vulnerable",
+                                    "vulnerability_pattern": "string - Patrón de vulnerabilidad detectado",
+                                    "rule_id": "string - ID de la regla que detectó el problema",
+                                    "severity": "string - Severidad del hallazgo",
+                                    "description": "string - Descripción del problema específico"
+                                }
+                            ],
+                            "technical_details": {
+                                "total_findings": "number - Total de hallazgos encontrados",
+                                "files_affected": "number - Archivos afectados",
+                                "vulnerability_types": ["string - Tipos de vulnerabilidades detectadas"],
+                                "semgrep_rules_matched": ["string - Reglas de Semgrep que coincidieron"]
+                            }
+                        },
+                        "dynamic_analysis": {
+                            "status": "string",
+                            "evidence": "string",
+                            "confidence": "string"
+                        },
+                        "combined_assessment": "string"
+                    },'''
+            tools_effectiveness_section = '''                    "static_analysis": "number",
+                    "dynamic_analysis": "number"'''
+        
+        expected_output = f"""
         Un JSON válido con la siguiente estructura:
-        {
-            "triage_metadata": {
+        {{
+            "triage_metadata": {{
                 "analysis_date": "string",
                 "analyst": "VulnValidation AI System",
                 "total_vulnerabilities_processed": "number",
                 "validation_methods_used": ["string"],
                 "confidence_threshold": "string"
-            },
-            "executive_summary": {
+            }},
+            "executive_summary": {{
                 "total_confirmed": "number",
                 "total_probable": "number",
                 "total_possible": "number",
@@ -86,9 +177,9 @@ class TriageTask:
                 "overall_risk_rating": "Critical|High|Medium|Low",
                 "key_findings": ["string"],
                 "immediate_actions_required": ["string"]
-            },
+            }},
             "validated_vulnerabilities": [
-                {
+                {{
                     "original_id": "string",
                     "title": "string",
                     "final_status": "CONFIRMADA|PROBABLE|POSIBLE|FALSO_POSITIVO|NO_TESTEABLE",
@@ -99,86 +190,73 @@ class TriageTask:
                     "risk_score": "number (0-10)",
                     "cwe_id": "string",
                     "owasp_category": "string",
-                    "validation_evidence": {
-                        "static_analysis": {
-                            "status": "string",
-                            "evidence": "string",
-                            "confidence": "string"
-                        },
-                        "dynamic_analysis": {
-                            "status": "string",
-                            "evidence": "string",
-                            "confidence": "string"
-                        },
-                        "combined_assessment": "string"
-                    },
-                    "exploitability_assessment": {
+{validation_evidence_section}
+                    "exploitability_assessment": {{
                         "ease_of_exploitation": "High|Medium|Low",
                         "attack_vector": "string",
                         "prerequisites": ["string"],
                         "proof_of_concept": "string"
-                    },
-                    "impact_assessment": {
+                    }},
+                    "impact_assessment": {{
                         "confidentiality_impact": "High|Medium|Low|None",
                         "integrity_impact": "High|Medium|Low|None",
                         "availability_impact": "High|Medium|Low|None",
                         "business_impact": "string",
                         "affected_assets": ["string"]
-                    },
-                    "remediation": {
+                    }},
+                    "remediation": {{
                         "priority": "P0|P1|P2|P3|P4",
                         "estimated_effort": "string",
                         "recommended_actions": ["string"],
                         "compensating_controls": ["string"],
                         "verification_steps": ["string"]
-                    },
+                    }},
                     "references": ["string"]
-                }
+                }}
             ],
-            "risk_analysis": {
+            "risk_analysis": {{
                 "threat_landscape": "string",
                 "attack_scenarios": [
-                    {
+                    {{
                         "scenario_name": "string",
                         "attack_path": "string",
                         "likelihood": "High|Medium|Low",
                         "impact": "string",
                         "mitigation": "string"
-                    }
+                    }}
                 ],
                 "compliance_impact": "string",
                 "regulatory_considerations": ["string"]
-            },
-            "recommendations": {
+            }},
+            "recommendations": {{
                 "immediate_actions": [
-                    {
+                    {{
                         "action": "string",
                         "timeline": "string",
                         "responsible_team": "string",
                         "success_criteria": "string"
-                    }
+                    }}
                 ],
                 "short_term_improvements": ["string"],
                 "long_term_strategy": ["string"],
                 "security_controls": [
-                    {
+                    {{
                         "control_type": "string",
                         "description": "string",
                         "implementation_priority": "High|Medium|Low"
-                    }
+                    }}
                 ]
-            },
-            "metrics": {
+            }},
+            "metrics": {{
                 "validation_accuracy": "number",
                 "false_positive_rate": "number",
                 "coverage_percentage": "number",
                 "time_to_validate": "string",
-                "tools_effectiveness": {
-                    "static_analysis": "number",
-                    "dynamic_analysis": "number"
-                }
-            }
-        }
+                "tools_effectiveness": {{
+{tools_effectiveness_section}
+                }}
+            }}
+        }}
         """
         
         return Task(

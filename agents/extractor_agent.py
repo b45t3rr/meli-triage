@@ -8,16 +8,17 @@ from crewai import Agent
 from langchain_openai import ChatOpenAI
 from typing import Dict, Any
 import json
+from config.llm_config import create_llm_instance
 
 class ExtractorAgent:
     """Agente especializado en extraer y categorizar vulnerabilidades de reportes PDF"""
     
-    def __init__(self, pdf_tool):
+    def __init__(self, pdf_tool, llm=None):
         self.pdf_tool = pdf_tool
-        self.llm = ChatOpenAI(
-            model="gpt-5-mini",
-            temperature=0.1
-        )
+        if llm is None:
+            self.llm = create_llm_instance("gpt-4o-mini", temperature=0.1)
+        else:
+            self.llm = llm
         
         self.agent = Agent(
             role="Especialista en Análisis de Vulnerabilidades",

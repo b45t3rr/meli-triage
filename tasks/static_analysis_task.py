@@ -23,33 +23,27 @@ class StaticAnalysisTask:
         CÓDIGO FUENTE A ANALIZAR: {source_code_path}
         
         Tu objetivo es:
-        1. Analizar las vulnerabilidades extraídas del reporte
-        2. Para cada vulnerabilidad, determinar:
-           - Qué reglas de Semgrep usar para detectarla
-           - Qué archivos/directorios específicos analizar
-           - Qué patrones de código buscar
+        1. Realizar un escaneo genérico completo del código fuente usando Semgrep con config="auto"
+        2. Usar el método analyze_vulnerabilities_with_llm para correlacionar inteligentemente los resultados
+        3. El LLM debe analizar contextualmente:
+           - Tipos de vulnerabilidad similares (ej: path traversal, directory traversal)
+           - Ubicaciones de archivos y patrones de código
+           - Funciones, métodos y parámetros específicos
+           - Evidencia del reporte vs hallazgos de Semgrep
         
-        3. Ejecutar análisis estático usando la herramienta Semgrep con:
-           - Reglas específicas para cada tipo de vulnerabilidad
-           - Configuraciones apropiadas por lenguaje
-           - Filtros de severidad relevantes
-        
-        4. Correlacionar los hallazgos de Semgrep con las vulnerabilidades del reporte:
-           - Identificar coincidencias por tipo de vulnerabilidad
-           - Verificar ubicaciones (archivos, líneas)
-           - Confirmar patrones de código vulnerable
-        
-        5. Para cada vulnerabilidad del reporte, determinar:
-           - CONFIRMADA: Si Semgrep encontró evidencia en el código
-           - NO_CONFIRMADA: Si no se encontró evidencia
-           - PARCIAL: Si se encontró código similar pero no exacto
+        4. Para cada vulnerabilidad del reporte, determinar:
+           - CONFIRMADA: Si el LLM encuentra evidencia correlacionada en Semgrep
+           - NO_CONFIRMADA: Si el LLM no encuentra evidencia suficiente
+           - PARCIAL: Si el LLM encuentra patrones similares pero no exactos
            - NO_APLICABLE: Si el tipo de vulnerabilidad no es detectable por análisis estático
         
-        Usa tu experiencia en análisis estático para:
-        - Seleccionar las reglas de Semgrep más apropiadas
-        - Interpretar los resultados en el contexto de las vulnerabilidades reportadas
-        - Identificar falsos positivos y negativos
-        - Proporcionar evidencia técnica específica
+        INSTRUCCIONES ESPECÍFICAS:
+        - Primero ejecuta perform_targeted_scan() pasando el path del código fuente Y las vulnerabilidades extraídas
+        - Este método generará automáticamente reglas de Semgrep específicas para cada tipo de vulnerabilidad reportada
+        - Luego usa analyze_vulnerabilities_with_llm() pasando los resultados de Semgrep y las vulnerabilidades extraídas
+        - El LLM debe proporcionar razonamiento detallado para cada correlación
+        - Si el LLM no está disponible, usa el método de fallback automáticamente
+        - Las reglas dinámicas se crean automáticamente para: Path Traversal, SQL Injection, SSRF, XSS, IDOR
         
         IMPORTANTE: Retorna ÚNICAMENTE un JSON válido con la estructura especificada.
         """
@@ -106,90 +100,3 @@ class StaticAnalysisTask:
             expected_output=expected_output,
             agent=agent
         )
-    
-    @staticmethod
-    def get_cwe_to_semgrep_mapping() -> Dict[str, list]:
-        """Mapeo de CWEs a reglas de Semgrep"""
-        return {
-            "CWE-89": [  # SQL Injection
-                "p/sql-injection",
-                "p/security-audit",
-                "rules.security.sql-injection"
-            ],
-            "CWE-79": [  # XSS
-                "p/xss",
-                "p/security-audit",
-                "rules.security.xss"
-            ],
-            "CWE-22": [  # Path Traversal
-                "p/path-traversal",
-                "p/security-audit",
-                "rules.security.path-traversal"
-            ],
-            "CWE-78": [  # Command Injection
-                "p/command-injection",
-                "p/security-audit",
-                "rules.security.command-injection"
-            ],
-            "CWE-94": [  # Code Injection
-                "p/code-injection",
-                "p/security-audit",
-                "rules.security.code-injection"
-            ],
-            "CWE-352": [  # CSRF
-                "p/csrf",
-                "p/security-audit",
-                "rules.security.csrf"
-            ],
-            "CWE-434": [  # File Upload
-                "p/file-upload",
-                "p/security-audit",
-                "rules.security.file-upload"
-            ],
-            "CWE-798": [  # Hard-coded Credentials
-                "p/secrets",
-                "p/security-audit",
-                "rules.security.hardcoded-secrets"
-            ],
-            "CWE-287": [  # Authentication Bypass
-                "p/authentication",
-                "p/security-audit",
-                "rules.security.authentication"
-            ],
-            "CWE-862": [  # Authorization
-                "p/authorization",
-                "p/security-audit",
-                "rules.security.authorization"
-            ]
-        }
-    
-    @staticmethod
-    def get_language_specific_configs() -> Dict[str, Dict[str, Any]]:
-        """Configuraciones específicas por lenguaje"""
-        return {
-            "python": {
-                "rules": ["p/python", "p/flask", "p/django"],
-                "extensions": [".py"],
-                "exclude_patterns": ["**/venv/**", "**/__pycache__/**"]
-            },
-            "javascript": {
-                "rules": ["p/javascript", "p/nodejs", "p/react"],
-                "extensions": [".js", ".jsx", ".ts", ".tsx"],
-                "exclude_patterns": ["**/node_modules/**", "**/dist/**"]
-            },
-            "java": {
-                "rules": ["p/java", "p/spring"],
-                "extensions": [".java"],
-                "exclude_patterns": ["**/target/**", "**/build/**"]
-            },
-            "php": {
-                "rules": ["p/php", "p/laravel"],
-                "extensions": [".php"],
-                "exclude_patterns": ["**/vendor/**"]
-            },
-            "csharp": {
-                "rules": ["p/csharp", "p/dotnet"],
-                "extensions": [".cs"],
-                "exclude_patterns": ["**/bin/**", "**/obj/**"]
-            }
-        }

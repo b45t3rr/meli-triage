@@ -58,6 +58,31 @@ class SemgrepTool(BaseTool):
             logger.error(f"Error ejecutando Semgrep: {str(e)}")
             return f"Error en análisis estático: {str(e)}"
     
+    def get_raw_results(self, target_path: str, rules: Optional[List[str]] = None, 
+                       config: str = "auto", language: Optional[str] = None,
+                       severity: Optional[str] = None, exclude_patterns: Optional[List[str]] = None) -> Dict[str, Any]:
+        """Ejecuta el análisis con Semgrep y retorna resultados en formato JSON crudo"""
+        logger = logging.getLogger(__name__)
+        try:
+            if not os.path.exists(target_path):
+                return {"error": f"La ruta {target_path} no existe"}
+            
+            # Verificar si Semgrep está instalado
+            if not self._check_semgrep_installed():
+                return {"error": "Semgrep no está instalado. Instálalo con: pip install semgrep"}
+            
+            # Construir comando de Semgrep
+            cmd = self._build_semgrep_command(target_path, rules, config, language, severity, exclude_patterns)
+            
+            # Ejecutar Semgrep
+            result = self._execute_semgrep(cmd)
+            
+            return result
+            
+        except Exception as e:
+            logger.error(f"Error ejecutando Semgrep: {str(e)}")
+            return {"error": f"Error en análisis estático: {str(e)}"}
+    
     def _check_semgrep_installed(self) -> bool:
         """Verifica si Semgrep está instalado"""
         try:
@@ -78,6 +103,14 @@ class SemgrepTool(BaseTool):
                 cmd.extend(["--config", rule])
         elif config:
             cmd.extend(["--config", config])
+            
+            # Agregar regla personalizada de path traversal cuando se usa config auto
+            if config == "auto":
+                # Buscar regla personalizada de path traversal en el directorio del proyecto
+                import os
+                custom_rule_path = os.path.join(target_path, "path_traversal_rule.yaml")
+                if os.path.exists(custom_rule_path):
+                    cmd.extend(["--config", custom_rule_path])
         
         # Filtro por lenguaje
         if language:
