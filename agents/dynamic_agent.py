@@ -23,21 +23,27 @@ class DynamicAgent:
         self.agent = Agent(
             role="Especialista en Análisis Dinámico y Penetration Testing",
             goal="Validar vulnerabilidades mediante análisis dinámico usando Nuclei y crear templates personalizados para explotación",
-            backstory="""
-            Eres un experto en penetration testing y análisis dinámico con más de 10 años 
+            backstory="""            Eres un experto en penetration testing y análisis dinámico con más de 10 años 
             de experiencia en herramientas como Nuclei, Burp Suite, OWASP ZAP, y Nmap. 
-            Tu especialidad es crear y ejecutar pruebas de penetración automatizadas 
-            para validar vulnerabilidades en aplicaciones web y servicios.
+            Tu especialidad es crear templates personalizados de Nuclei para validar 
+            vulnerabilidades específicas identificadas en reportes de seguridad.
             
-            Tu experiencia incluye:
-            - Creación de templates personalizados de Nuclei
-            - Análisis de tráfico HTTP/HTTPS y protocolos de red
-            - Técnicas de bypass de WAF y filtros de seguridad
-            - Explotación manual y automatizada de vulnerabilidades
-            - Correlación de hallazgos dinámicos con análisis estático
+            Tu enfoque es DIRIGIDO y ESPECÍFICO:
+            - NO dependes de templates genéricos o predefinidos de Nuclei
+            - Creas templates YAML personalizados para cada vulnerabilidad específica
+            - Analizas reportes de vulnerabilidades para extraer endpoints, parámetros y payloads exactos
+            - Diseñas pruebas de penetración dirigidas basadas en evidencia específica
+            - Correlacionas hallazgos dinámicos con análisis estático para mayor precisión
             
-            Tu trabajo es fundamental para confirmar la explotabilidad real de las 
-            vulnerabilidades identificadas y proporcionar evidencia práctica de su impacto.
+            Tu metodología incluye:
+            - Parsing detallado de reportes de vulnerabilidades
+            - Creación de templates Nuclei específicos por vulnerabilidad
+            - Implementación de payloads dirigidos según el tipo de CWE
+            - Técnicas de bypass de WAF adaptadas al contexto específico
+            - Documentación forense completa de cada intento de explotación
+            
+            Tu trabajo es fundamental para confirmar la explotabilidad real de 
+            vulnerabilidades específicas y proporcionar evidencia práctica dirigida.
             """,
             verbose=True,
             allow_delegation=False,
@@ -84,101 +90,7 @@ class DynamicAgent:
             ]
         }
     
-    def get_cwe_to_nuclei_mapping(self) -> Dict[str, Dict[str, Any]]:
-        """Mapeo de CWEs a configuraciones específicas de Nuclei"""
-        return {
-            "CWE-89": {  # SQL Injection
-                "tags": ["sqli", "injection"],
-                "payloads": [
-                    "' OR '1'='1",
-                    "'; DROP TABLE users; --",
-                    "' UNION SELECT 1,2,3 --",
-                    "{{BaseURL}}/?id=1' AND (SELECT COUNT(*) FROM information_schema.tables)>0 --"
-                ],
-                "matchers": [
-                    {"type": "word", "words": ["SQL syntax", "mysql_fetch", "ORA-", "PostgreSQL"]},
-                    {"type": "regex", "regex": ["SQL.*error", "database.*error"]}
-                ],
-                "nuclei_templates": ["sql-injection", "blind-sqli", "error-based-sqli"]
-            },
-            "CWE-79": {  # XSS
-                "tags": ["xss", "injection"],
-                "payloads": [
-                    "<script>alert('XSS')</script>",
-                    "<img src=x onerror=alert('XSS')>",
-                    "javascript:alert('XSS')",
-                    "{{BaseURL}}/?q=<script>alert(document.domain)</script>"
-                ],
-                "matchers": [
-                    {"type": "word", "words": ["<script>alert", "onerror=alert"]},
-                    {"type": "regex", "regex": ["<script[^>]*>.*</script>"]}
-                ],
-                "nuclei_templates": ["xss-reflected", "xss-stored", "dom-xss"]
-            },
-            "CWE-352": {  # CSRF
-                "tags": ["csrf", "auth"],
-                "payloads": [
-                    "<form method='POST' action='{{BaseURL}}/admin/delete'><input type='submit' value='Delete'></form>"
-                ],
-                "matchers": [
-                    {"type": "status", "status": [200, 302]},
-                    {"type": "word", "words": ["deleted", "success"], "negative": True}
-                ],
-                "nuclei_templates": ["csrf-token-bypass", "csrf-protection-bypass"]
-            },
-            "CWE-22": {  # Path Traversal
-                "tags": ["lfi", "traversal"],
-                "payloads": [
-                    "../../../etc/passwd",
-                    "..\\..\\..\\windows\\system32\\drivers\\etc\\hosts",
-                    "{{BaseURL}}/download?file=../../../etc/passwd"
-                ],
-                "matchers": [
-                    {"type": "regex", "regex": ["root:.*:0:0:", "\\[drivers\\]"]},
-                    {"type": "word", "words": ["root:", "daemon:", "# localhost"]}
-                ],
-                "nuclei_templates": ["lfi-linux", "lfi-windows", "path-traversal"]
-            },
-            "CWE-78": {  # Command Injection
-                "tags": ["rce", "injection"],
-                "payloads": [
-                    "; id",
-                    "| whoami",
-                    "& echo vulnerable",
-                    "{{BaseURL}}/exec?cmd=id"
-                ],
-                "matchers": [
-                    {"type": "regex", "regex": ["uid=\\d+", "gid=\\d+"]},
-                    {"type": "word", "words": ["vulnerable", "root", "administrator"]}
-                ],
-                "nuclei_templates": ["command-injection", "rce-detection"]
-            },
-            "CWE-200": {  # Information Disclosure
-                "tags": ["disclosure", "info-leak"],
-                "payloads": [
-                    "{{BaseURL}}/.env",
-                    "{{BaseURL}}/config.php",
-                    "{{BaseURL}}/admin/"
-                ],
-                "matchers": [
-                    {"type": "word", "words": ["DB_PASSWORD", "API_KEY", "SECRET"]},
-                    {"type": "status", "status": [200]}
-                ],
-                "nuclei_templates": ["config-exposure", "sensitive-files", "directory-listing"]
-            },
-            "CWE-601": {  # Open Redirect
-                "tags": ["redirect", "open-redirect"],
-                "payloads": [
-                    "{{BaseURL}}/redirect?url=http://evil.com",
-                    "{{BaseURL}}/login?next=//evil.com"
-                ],
-                "matchers": [
-                    {"type": "header", "headers": {"location": "evil.com"}},
-                    {"type": "status", "status": [301, 302, 307, 308]}
-                ],
-                "nuclei_templates": ["open-redirect", "redirect-bypass"]
-            }
-        }
+
     
     def get_nuclei_command_templates(self) -> Dict[str, str]:
         """Templates de comandos Nuclei para diferentes tipos de escaneo"""
@@ -284,3 +196,185 @@ class DynamicAgent:
             "Low": "low",
             "Info": "info"
         }
+    
+    def create_custom_template_for_vulnerability(self, vulnerability: Dict[str, Any]) -> str:
+        """Crea un template personalizado de Nuclei para una vulnerabilidad específica"""
+        try:
+            # Extraer información de la vulnerabilidad
+            vuln_title = vulnerability.get('title', 'Custom Vulnerability')
+            vuln_description = vulnerability.get('description', '')
+            vuln_cwe = vulnerability.get('cwe', '')
+            vuln_severity = vulnerability.get('severity', 'medium')
+            vuln_url = vulnerability.get('url', '')
+            vuln_parameter = vulnerability.get('parameter', '')
+            vuln_payload = vulnerability.get('payload', '')
+            
+            # Determinar payloads a usar basados en la vulnerabilidad específica
+            payloads = []
+            if vuln_payload:
+                payloads.append(vuln_payload)
+            
+            # Generar payloads dinámicos basados en el tipo de CWE
+            if 'XSS' in vuln_title.upper() or 'CWE-79' in vuln_cwe:
+                payloads.extend(["<script>alert('XSS')</script>", "<img src=x onerror=alert('XSS')>"])
+            elif 'SQL' in vuln_title.upper() or 'CWE-89' in vuln_cwe:
+                payloads.extend(["' OR '1'='1", "' UNION SELECT NULL--"])
+            elif 'COMMAND' in vuln_title.upper() or 'CWE-78' in vuln_cwe:
+                payloads.extend(["; whoami", "| id"])
+            elif 'TRAVERSAL' in vuln_title.upper() or 'CWE-22' in vuln_cwe:
+                payloads.extend(["../../../etc/passwd", "..\\..\\..\\windows\\system32\\drivers\\etc\\hosts"])
+            
+            # Determinar matchers
+            matchers = []
+            if cwe_config.get('matchers'):
+                matchers.extend(cwe_config['matchers'])
+            
+            # Construir el path del endpoint
+            path = "/"
+            if vuln_url:
+                from urllib.parse import urlparse
+                parsed = urlparse(vuln_url)
+                path = parsed.path or "/"
+            
+            # Crear template personalizado
+            template = {
+                "id": f"custom-{vuln_cwe.lower().replace('cwe-', '')}-{hash(vuln_title) % 10000}",
+                "info": {
+                    "name": f"Custom Test: {vuln_title}",
+                    "author": "GenIA Dynamic Agent",
+                    "severity": self.get_nuclei_severity_mapping().get(vuln_severity, "medium"),
+                    "description": f"Template personalizado para validar: {vuln_description[:200]}",
+                    "classification": {
+                        "cwe-id": vuln_cwe
+                    },
+                    "tags": cwe_config.get('tags', ['custom']) + ['validation']
+                },
+                "requests": []
+            }
+            
+            # Crear requests para diferentes métodos y payloads
+            methods = ['GET', 'POST']
+            
+            for method in methods:
+                for i, payload in enumerate(payloads[:2]):  # Máximo 2 payloads por método
+                    request = {
+                        "method": method,
+                        "path": [path],
+                        "headers": {
+                            "User-Agent": "GenIA-Security-Scanner"
+                        }
+                    }
+                    
+                    # Agregar payload según el método
+                    if method == "GET":
+                        if vuln_parameter:
+                            request["path"] = [f"{path}?{vuln_parameter}={payload}"]
+                        else:
+                            request["path"] = [f"{path}?test={payload}"]
+                    else:  # POST
+                        if vuln_parameter:
+                            request["body"] = f"{vuln_parameter}={payload}"
+                        else:
+                            request["body"] = f"test={payload}"
+                        request["headers"]["Content-Type"] = "application/x-www-form-urlencoded"
+                    
+                    # Agregar matchers
+                    request["matchers-condition"] = "or"
+                    request["matchers"] = [
+                        {
+                            "type": "status",
+                            "status": [200, 500]
+                        }
+                    ]
+                    
+                    # Agregar matchers específicos del CWE
+                    if matchers:
+                        for matcher in matchers[:3]:  # Máximo 3 matchers
+                            request["matchers"].append({
+                                "type": "word",
+                                "words": [matcher],
+                                "part": "body"
+                            })
+                    
+                    template["requests"].append(request)
+            
+            # Convertir a YAML
+            import yaml
+            return yaml.dump(template, default_flow_style=False, allow_unicode=True)
+            
+        except Exception as e:
+            # Template básico en caso de error
+            basic_template = {
+                "id": "custom-basic-test",
+                "info": {
+                    "name": "Basic Custom Test",
+                    "author": "GenIA Dynamic Agent",
+                    "severity": "medium",
+                    "description": "Template básico para validación",
+                    "tags": ["custom"]
+                },
+                "requests": [{
+                    "method": "GET",
+                    "path": ["/"],
+                    "matchers": [{
+                        "type": "status",
+                        "status": [200]
+                    }]
+                }]
+            }
+            import yaml
+            return yaml.dump(basic_template, default_flow_style=False, allow_unicode=True)
+    
+    def generate_targeted_nuclei_strategy(self, vulnerabilities: List[Dict[str, Any]]) -> Dict[str, Any]:
+        """Genera una estrategia de testing dirigida basada en las vulnerabilidades encontradas"""
+        strategy = {
+            "custom_templates": [],
+            "targeted_tags": set(),
+            "severity_focus": set(),
+            "specific_endpoints": set(),
+            "testing_approach": "targeted"
+        }
+        
+        for vuln in vulnerabilities:
+            # Crear template personalizado
+            custom_template = self.create_custom_template_for_vulnerability(vuln)
+            strategy["custom_templates"].append({
+                "vulnerability_id": vuln.get('id', ''),
+                "template_content": custom_template,
+                "rationale": f"Template específico para {vuln.get('title', 'vulnerabilidad')}"
+            })
+            
+            # Agregar tags relevantes basados en el tipo de vulnerabilidad
+            cwe = vuln.get('cwe', '')
+            vuln_title = vuln.get('title', '').upper()
+            
+            # Generar tags dinámicamente
+            if 'XSS' in vuln_title or 'CWE-79' in cwe:
+                strategy["targeted_tags"].update(["xss", "injection"])
+            elif 'SQL' in vuln_title or 'CWE-89' in cwe:
+                strategy["targeted_tags"].update(["sqli", "injection", "database"])
+            elif 'COMMAND' in vuln_title or 'CWE-78' in cwe:
+                strategy["targeted_tags"].update(["rce", "injection", "command"])
+            elif 'TRAVERSAL' in vuln_title or 'CWE-22' in cwe:
+                strategy["targeted_tags"].update(["lfi", "traversal", "file"])
+            elif 'CSRF' in vuln_title or 'CWE-352' in cwe:
+                strategy["targeted_tags"].update(["csrf", "token"])
+            elif 'DISCLOSURE' in vuln_title or 'CWE-200' in cwe:
+                strategy["targeted_tags"].update(["exposure", "disclosure", "info"])
+            
+            # Agregar severidad
+            severity = vuln.get('severity', 'medium')
+            nuclei_severity = self.get_nuclei_severity_mapping().get(severity, 'medium')
+            strategy["severity_focus"].add(nuclei_severity)
+            
+            # Agregar endpoints específicos
+            url = vuln.get('url', '')
+            if url:
+                strategy["specific_endpoints"].add(url)
+        
+        # Convertir sets a listas para serialización
+        strategy["targeted_tags"] = list(strategy["targeted_tags"])
+        strategy["severity_focus"] = list(strategy["severity_focus"])
+        strategy["specific_endpoints"] = list(strategy["specific_endpoints"])
+        
+        return strategy

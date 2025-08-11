@@ -129,13 +129,15 @@ class StaticAgent:
             4. Funciones o métodos específicos
             5. Parámetros o variables mencionadas
             
+            IMPORTANTE: Para vulnerabilidades con status PROBABLE, PARCIAL o CONFIRMADA, SIEMPRE incluye evidencia detallada en matching_findings.
+            
             Retorna un JSON con la siguiente estructura:
             {{
                 "correlations": [
                     {{
                         "vulnerability_id": "string",
                         "vulnerability_title": "string",
-                        "status": "CONFIRMADA|NO_CONFIRMADA|PARCIAL",
+                        "status": "CONFIRMADA|NO_CONFIRMADA|PARCIAL|PROBABLE",
                         "confidence": "High|Medium|Low",
                         "matching_findings": [
                             {{
@@ -148,7 +150,8 @@ class StaticAgent:
                                 "match_reason": "string"
                             }}
                         ],
-                        "reasoning": "string explicando por qué se considera confirmada/no confirmada"
+                        "evidence": "string con evidencia detallada encontrada",
+                        "reasoning": "string explicando por qué se considera confirmada/no confirmada/probable"
                     }}
                 ]
             }}
@@ -158,15 +161,42 @@ class StaticAgent:
             if hasattr(self, 'llm') and self.llm:
                 response = self.llm.invoke(analysis_prompt)
                 try:
-                    # Intentar parsear la respuesta como JSON
+                    # Extraer el contenido de la respuesta
                     if hasattr(response, 'content'):
-                        result = json.loads(response.content)
+                        response_text = response.content
                     else:
-                        result = json.loads(str(response))
+                        response_text = str(response)
+                    
+                    # Limpiar la respuesta para extraer JSON
+                    response_text = response_text.strip()
+                    
+                    # Buscar JSON en la respuesta usando diferentes patrones
+                    json_start = response_text.find('{')
+                    json_end = response_text.rfind('}') + 1
+                    
+                    if json_start != -1 and json_end > json_start:
+                        json_text = response_text[json_start:json_end]
+                        result = json.loads(json_text)
+                    else:
+                        # Intentar parsear toda la respuesta
+                        result = json.loads(response_text)
+                    
+                    # Asegurar que todas las correlaciones con hallazgos tengan evidencia
+                    if 'correlations' in result:
+                        for correlation in result['correlations']:
+                            if correlation.get('matching_findings') and not correlation.get('evidence'):
+                                # Generar evidencia automáticamente si no está presente
+                                evidence_parts = []
+                                for finding in correlation['matching_findings']:
+                                    evidence_parts.append(f"Archivo: {finding.get('file_path', 'N/A')} (línea {finding.get('line_number', 'N/A')}) - {finding.get('message', 'N/A')}")
+                                correlation['evidence'] = "\n".join(evidence_parts)
+                    
                     return result
-                except json.JSONDecodeError:
-                    # Si no es JSON válido, retornar la respuesta como texto
-                    return {"analysis_text": str(response), "error": "LLM response was not valid JSON"}
+                except (json.JSONDecodeError, ValueError) as e:
+                    # Si no es JSON válido, usar fallback
+                    print(f"[WARNING] LLM response no es JSON válido: {e}")
+                    print(f"[DEBUG] Respuesta del LLM: {response_text[:500]}...")
+                    return self._fallback_correlation(semgrep_results, reported_vulnerabilities)
             else:
                 # Fallback al método anterior si no hay LLM disponible
                 return self._fallback_correlation(semgrep_results, reported_vulnerabilities)
@@ -227,7 +257,7 @@ class StaticAgent:
             # Convertir severidad al formato Semgrep
             semgrep_severity = self._convert_severity_to_semgrep(severity)
             
-            # Crear prompt para generar la regla
+            # Crear prompt mejorado para generar la regla
             rule_generation_prompt = f"""
             Eres un experto en análisis de seguridad y creación de reglas de Semgrep. Tu tarea es generar una regla YAML de Semgrep específica para detectar la siguiente vulnerabilidad:
             
@@ -238,40 +268,63 @@ class StaticAgent:
             - Evidencia: {evidence}
             - Severidad: {severity}
             
+            PATRONES DE EJEMPLO POR TIPO DE VULNERABILIDAD:
+            
+            PATH TRAVERSAL:
+            - os.path.join($BASE, $USER_INPUT) donde $USER_INPUT viene de request.args/form
+            - send_file(os.path.join(..., $USER_INPUT), ...)
+            - open(os.path.join(..., $USER_INPUT), ...)
+            - Buscar uso de '../' o '..' en rutas de archivos
+            
+            COMMAND INJECTION:
+            - os.system($USER_INPUT)
+            - subprocess.call($USER_INPUT)
+            - eval($USER_INPUT)
+            
             INSTRUCCIONES:
-            1. Analiza la información proporcionada para entender el tipo de vulnerabilidad
-            2. Identifica los patrones de código que podrían indicar esta vulnerabilidad
-            3. Genera una regla YAML de Semgrep válida y específica
-            4. Incluye patrones positivos (pattern) y negativos (pattern-not) cuando sea apropiado
-            5. Asigna un CWE apropiado basado en el tipo de vulnerabilidad
-            6. Usa el lenguaje de programación más apropiado (python, javascript, java, etc.)
+            1. Analiza el título y descripción para identificar el tipo de vulnerabilidad
+            2. Crea los patrones apropiados según el tipo detectado
+            3. Incluye múltiples variantes del patrón cuando sea posible
+            4. Usa pattern-either para múltiples patrones alternativos
+            5. Incluye pattern-not para reducir falsos positivos
+            6. Asigna el CWE correcto según el tipo de vulnerabilidad
+            
             
             FORMATO DE SALIDA:
             Retorna ÚNICAMENTE el contenido YAML de la regla, sin explicaciones adicionales.
             
-            EJEMPLO DE ESTRUCTURA:
-            ```yaml
-            rules:
-              - id: dynamic-{vuln_id}
-                patterns:
-                  - pattern: [patrón específico basado en la vulnerabilidad]
-                  - pattern-not: [patrón de exclusión si es necesario]
-                message: |
-                  [Mensaje descriptivo de la vulnerabilidad detectada]
-                languages: [lenguaje apropiado]
-                severity: {semgrep_severity}
-                metadata:
-                  category: security
-                  cwe:
-                    - "[CWE apropiado]"
-                  confidence: HIGH
-                  likelihood: HIGH
-                  impact: HIGH
-                  subcategory:
-                    - vuln
-            ```
+            EJEMPLO GENÉRICO:
+             ```yaml
+             rules:
+               - id: dynamic-{vuln_id}
+                 patterns:
+                   - pattern-either:
+                       - pattern: |
+                           $INPUT = request.args.get($KEY)
+                           ...
+                           $VULNERABLE_FUNCTION($INPUT, ...)
+                       - pattern: |
+                           $INPUT = request.form.get($KEY)
+                           ...
+                           $VULNERABLE_FUNCTION(..., $INPUT, ...)
+                       - pattern: |
+                           $VULNERABLE_FUNCTION($INPUT)
+                 message: |
+                   Potential vulnerability detected: [descripción específica basada en el tipo]
+                 languages: [lenguaje detectado automáticamente]
+                 severity: {semgrep_severity}
+                 metadata:
+                   category: security
+                   cwe:
+                     - "[CWE apropiado según el tipo de vulnerabilidad]"
+                   confidence: HIGH
+                   likelihood: HIGH
+                   impact: HIGH
+                   subcategory:
+                     - vuln
+             ```
             
-            Genera la regla ahora:
+            Genera la regla ahora basándote en la información proporcionada:
             """
             
             # Usar el LLM para generar la regla
@@ -413,6 +466,7 @@ class StaticAgent:
                     "status": "NO_CONFIRMADA",
                     "confidence": "Low",
                     "matching_findings": [],
+                    "evidence": "",
                     "reasoning": "Análisis automático con correlación por palabras clave - se recomienda revisión manual"
                 }
                 
@@ -470,17 +524,24 @@ class StaticAgent:
                             correlation["status"] = "CONFIRMADA"
                             correlation["confidence"] = "High"
                         elif match_score >= 3:
-                            correlation["status"] = "PARCIAL"
+                            correlation["status"] = "PROBABLE"
                             correlation["confidence"] = "Medium"
                         else:
-                            correlation["status"] = "PARCIAL"
+                            correlation["status"] = "PROBABLE"
                             correlation["confidence"] = "Low"
                 
-                # Actualizar reasoning basado en los resultados
+                # Actualizar reasoning y evidencia basado en los resultados
                 if correlation["matching_findings"]:
                     correlation["reasoning"] = f"Se encontraron {len(correlation['matching_findings'])} hallazgos correlacionados. Tipos detectados: {', '.join(detected_vuln_types)}"
+                    
+                    # Generar evidencia automáticamente
+                    evidence_parts = []
+                    for finding in correlation["matching_findings"]:
+                        evidence_parts.append(f"Archivo: {finding.get('file_path', 'N/A')} (línea {finding.get('line_number', 'N/A')}) - {finding.get('message', 'N/A')}")
+                    correlation["evidence"] = "\n".join(evidence_parts)
                 else:
                     correlation["reasoning"] = f"No se encontraron hallazgos correlacionados. Tipos detectados: {', '.join(detected_vuln_types) if detected_vuln_types else 'Ninguno'}"
+                    correlation["evidence"] = "No se encontró evidencia específica en el análisis estático"
                 
                 correlations.append(correlation)
             

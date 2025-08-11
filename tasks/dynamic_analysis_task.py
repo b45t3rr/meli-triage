@@ -26,40 +26,57 @@ class DynamicAnalysisTask:
         TARGET URL: {target_url}
         
         Tu objetivo es:
-        1. Analizar las vulnerabilidades extraídas y los resultados del análisis estático
-        2. Para cada vulnerabilidad confirmada o parcialmente confirmada:
-           - Determinar si es testeable dinámicamente
-           - Seleccionar templates de Nuclei apropiados
-           - Crear templates personalizados si es necesario
+        1. ANALIZAR VULNERABILIDADES ESPECÍFICAS:
+           - Parsear las vulnerabilidades extraídas del reporte
+           - Identificar CWEs, endpoints, parámetros y payloads específicos
+           - Correlacionar con resultados del análisis estático si están disponibles
         
-        3. Ejecutar análisis dinámico usando la herramienta Nuclei:
-           - Usar templates específicos para cada tipo de vulnerabilidad
-           - Aplicar payloads dirigidos basados en la evidencia del reporte
-           - Testear endpoints específicos mencionados en el reporte
+        2. CREAR TEMPLATES PERSONALIZADOS DE NUCLEI:
+           - NO uses templates genéricos o predefinidos de Nuclei
+           - Para CADA vulnerabilidad específica, crea un template YAML personalizado que:
+             * Use los endpoints exactos mencionados en el reporte
+             * Incluya los parámetros vulnerables identificados
+             * Implemente los payloads específicos del tipo de vulnerabilidad
+             * Tenga matchers apropiados para detectar la explotación exitosa
         
-        4. Para vulnerabilidades que requieren templates personalizados:
-           - Crear templates YAML específicos basados en:
-             * URLs/endpoints del reporte
-             * Parámetros vulnerables identificados
-             * Payloads específicos mencionados
-             * Evidencia del análisis estático
+        3. EJECUTAR ANÁLISIS DINÁMICO DIRIGIDO:
+           - Usar ÚNICAMENTE los templates personalizados creados
+           - Testear cada endpoint vulnerable con payloads específicos
+           - Aplicar técnicas de bypass si es necesario
+           - Documentar cada intento de explotación con evidencia HTTP completa
         
-        5. Correlacionar resultados de Nuclei con vulnerabilidades reportadas:
-           - Confirmar explotabilidad
-           - Verificar impacto real
-           - Documentar evidencia de explotación
+        4. VALIDACIÓN DE EXPLOTABILIDAD:
+           Para cada vulnerabilidad, determinar:
+           - EXPLOTABLE: Confirmada mediante explotación exitosa con evidencia
+           - NO_EXPLOTABLE: No se pudo explotar después de intentos dirigidos
+           - PARCIAL: Respuesta anómala que indica vulnerabilidad pero sin explotación completa
+           - NO_TESTEABLE: No es posible testear dinámicamente (ej: vulnerabilidades de configuración)
         
-        6. Para cada vulnerabilidad, determinar:
-           - EXPLOTABLE: Confirmada mediante explotación exitosa
-           - NO_EXPLOTABLE: No se pudo explotar
-           - PARCIAL: Respuesta anómala pero sin explotación completa
-           - NO_TESTEABLE: No es posible testear dinámicamente
+        5. ENFOQUE DIRIGIDO vs GENÉRICO:
+           - Prioriza la creación de templates específicos sobre el uso de templates genéricos
+           - Cada template debe ser diseñado para la vulnerabilidad específica reportada
+           - Usa la información contextual del reporte para crear pruebas más precisas
+        
+        7. DOCUMENTAR EVIDENCIA HTTP DETALLADA:
+           Para cada intento de explotación, DEBES registrar:
+           - URL completa de la solicitud HTTP
+           - Método HTTP utilizado (GET, POST, PUT, etc.)
+           - Headers completos de la solicitud
+           - Cuerpo completo de la solicitud incluyendo el payload
+           - Código de estado HTTP de la respuesta
+           - Headers completos de la respuesta
+           - Cuerpo completo de la respuesta
+           - Tiempo de respuesta
+           - Indicadores específicos que demuestran la vulnerabilidad
+           - Template de Nuclei utilizado
+           - Técnica de explotación empleada
         
         Usa tu experiencia en penetration testing para:
         - Crear templates de Nuclei efectivos
         - Interpretar respuestas de la aplicación
         - Identificar indicadores de vulnerabilidades
         - Evitar falsos positivos
+        - Capturar evidencia forense completa de las explotaciones
         
         IMPORTANTE: 
         - Retorna ÚNICAMENTE un JSON válido con la estructura especificada.
@@ -102,9 +119,24 @@ class DynamicAnalysisTask:
                         "custom_template_used": "boolean"
                     },
                     "evidence": {
-                        "request": "string",
-                        "response": "string",
-                        "proof_of_concept": "string"
+                        "http_evidence": [
+                            {
+                                "request_url": "string - URL completa de la solicitud",
+                                "request_method": "string - Método HTTP (GET, POST, etc.)",
+                                "request_headers": "string - Headers de la solicitud HTTP",
+                                "request_body": "string - Cuerpo de la solicitud (payload)",
+                                "response_status": "number - Código de estado HTTP",
+                                "response_headers": "string - Headers de la respuesta",
+                                "response_body": "string - Cuerpo de la respuesta (evidencia)",
+                                "response_time": "string - Tiempo de respuesta",
+                                "vulnerability_indicator": "string - Indicador específico de vulnerabilidad",
+                                "payload_type": "string - Tipo de payload utilizado",
+                                "nuclei_template": "string - Template de Nuclei utilizado",
+                                "exploitation_technique": "string - Técnica de explotación empleada"
+                            }
+                        ],
+                        "proof_of_concept": "string - Descripción detallada del PoC",
+                        "exploitation_steps": ["string - Pasos específicos para reproducir la explotación"]
                     },
                     "impact_assessment": {
                         "exploitability": "High|Medium|Low",
@@ -139,59 +171,7 @@ class DynamicAnalysisTask:
             agent=agent
         )
     
-    @staticmethod
-    def get_cwe_to_nuclei_mapping() -> Dict[str, Dict[str, Any]]:
-        """Mapeo de CWEs a configuraciones de Nuclei"""
-        return {
-            "CWE-89": {
-                "tags": ["sqli", "injection"],
-                "templates": ["sql-injection", "blind-sqli", "error-sqli"],
-                "severity": ["critical", "high"],
-                "custom_template_needed": True
-            },
-            "CWE-79": {
-                "tags": ["xss", "injection"],
-                "templates": ["reflected-xss", "stored-xss", "dom-xss"],
-                "severity": ["high", "medium"],
-                "custom_template_needed": True
-            },
-            "CWE-22": {
-                "tags": ["lfi", "traversal"],
-                "templates": ["path-traversal", "lfi", "directory-traversal"],
-                "severity": ["high", "medium"],
-                "custom_template_needed": False
-            },
-            "CWE-78": {
-                "tags": ["rce", "injection"],
-                "templates": ["command-injection", "rce"],
-                "severity": ["critical", "high"],
-                "custom_template_needed": True
-            },
-            "CWE-94": {
-                "tags": ["rce", "injection"],
-                "templates": ["code-injection", "eval-injection"],
-                "severity": ["critical", "high"],
-                "custom_template_needed": True
-            },
-            "CWE-352": {
-                "tags": ["csrf"],
-                "templates": ["csrf"],
-                "severity": ["medium"],
-                "custom_template_needed": False
-            },
-            "CWE-434": {
-                "tags": ["upload", "rce"],
-                "templates": ["file-upload", "unrestricted-upload"],
-                "severity": ["high", "medium"],
-                "custom_template_needed": True
-            },
-            "CWE-200": {
-                "tags": ["exposure", "disclosure"],
-                "templates": ["info-disclosure", "sensitive-data"],
-                "severity": ["medium", "low"],
-                "custom_template_needed": False
-            }
-        }
+
     
     @staticmethod
     def get_nuclei_template_structure() -> Dict[str, Any]:

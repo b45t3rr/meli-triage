@@ -220,17 +220,8 @@ class SemgrepTool(BaseTool):
             for error in errors:
                 formatted_parts.append(f"- {error}")
         
-        # Recomendaciones
-        formatted_parts.append("\n=== RECOMENDACIONES ===")
+        # Aviso cuando no hay vulnerabilidades
         if not results:
-            formatted_parts.append("✅ No se encontraron vulnerabilidades con las reglas aplicadas.")
-        else:
-            high_severity = [r for r in results if r.get("extra", {}).get("severity") == "ERROR"]
-            if high_severity:
-                formatted_parts.append(f"🔴 {len(high_severity)} hallazgos de alta severidad requieren atención inmediata.")
-            
-            medium_severity = [r for r in results if r.get("extra", {}).get("severity") == "WARNING"]
-            if medium_severity:
-                formatted_parts.append(f"🟡 {len(medium_severity)} hallazgos de severidad media deben ser revisados.")
+            formatted_parts.append("\n✅ No se encontraron vulnerabilidades con las reglas aplicadas.")
         
         return "\n".join(formatted_parts)

@@ -61,15 +61,32 @@ class TriageTask:
            - Documentar indicadores técnicos
         
         INSTRUCCIONES ESPECÍFICAS PARA LA EVIDENCIA:
+        
+        EVIDENCIA DE ANÁLISIS ESTÁTICO:
         - Para cada vulnerabilidad confirmada o parcial, DEBES incluir:
           * Fragmentos exactos del código vulnerable encontrado
           * Rutas completas de archivos y números de línea específicos
           * Descripción técnica del patrón de vulnerabilidad detectado
           * ID de las reglas de Semgrep que detectaron el problema
           * Contexto del código circundante cuando sea relevante
+        
+        EVIDENCIA DE ANÁLISIS DINÁMICO:
+        - Para cada vulnerabilidad explotada o parcialmente explotada, DEBES incluir:
+          * URL completa de la solicitud HTTP utilizada
+          * Método HTTP y headers completos de la solicitud
+          * Payload exacto utilizado en el cuerpo de la solicitud
+          * Código de estado y headers completos de la respuesta
+          * Cuerpo completo de la respuesta que demuestra la vulnerabilidad
+          * Tiempo de respuesta y indicadores específicos de explotación
+          * Template de Nuclei utilizado y técnica de explotación empleada
+          * Descripción detallada de cómo reproducir la explotación
+        
         - La evidencia debe ser lo suficientemente detallada para que un desarrollador
-          pueda localizar y entender exactamente el problema sin necesidad de
-          herramientas adicionales
+          o analista de seguridad pueda:
+          * Localizar exactamente el problema en el código (análisis estático)
+          * Reproducir completamente la explotación (análisis dinámico)
+          * Entender el impacto real de la vulnerabilidad
+          * Implementar las correcciones necesarias sin herramientas adicionales
         
         Usa tu experiencia en triage de seguridad para:
         - Evaluar la credibilidad de diferentes tipos de evidencia
@@ -118,9 +135,32 @@ class TriageTask:
             validation_evidence_section = '''
                     "validation_evidence": {
                         "dynamic_analysis": {
-                            "status": "string",
-                            "evidence": "string",
-                            "confidence": "string"
+                            "status": "EXPLOTABLE|NO_EXPLOTABLE|PARCIAL|NO_TESTEABLE",
+                            "confidence": "High|Medium|Low",
+                            "exploitation_summary": "string - Resumen detallado de la explotación",
+                            "http_evidence": [
+                                {
+                                    "request_url": "string - URL completa de la solicitud",
+                                    "request_method": "string - Método HTTP (GET, POST, etc.)",
+                                    "request_headers": "string - Headers de la solicitud HTTP",
+                                    "request_body": "string - Cuerpo de la solicitud (payload)",
+                                    "response_status": "number - Código de estado HTTP",
+                                    "response_headers": "string - Headers de la respuesta",
+                                    "response_body": "string - Cuerpo de la respuesta (evidencia)",
+                                    "response_time": "string - Tiempo de respuesta",
+                                    "vulnerability_indicator": "string - Indicador específico de vulnerabilidad",
+                                    "payload_type": "string - Tipo de payload utilizado",
+                                    "nuclei_template": "string - Template de Nuclei utilizado",
+                                    "exploitation_technique": "string - Técnica de explotación empleada"
+                                }
+                            ],
+                            "technical_details": {
+                                "total_requests": "number - Total de solicitudes realizadas",
+                                "successful_exploits": "number - Explotaciones exitosas",
+                                "templates_used": ["string - Templates de Nuclei utilizados"],
+                                "custom_templates_created": "number - Templates personalizados creados",
+                                "target_endpoints": ["string - Endpoints objetivo testeados"]
+                            }
                         },
                         "combined_assessment": "string"
                     },'''
@@ -151,9 +191,32 @@ class TriageTask:
                             }
                         },
                         "dynamic_analysis": {
-                            "status": "string",
-                            "evidence": "string",
-                            "confidence": "string"
+                            "status": "EXPLOTABLE|NO_EXPLOTABLE|PARCIAL|NO_TESTEABLE",
+                            "confidence": "High|Medium|Low",
+                            "exploitation_summary": "string - Resumen detallado de la explotación",
+                            "http_evidence": [
+                                {
+                                    "request_url": "string - URL completa de la solicitud",
+                                    "request_method": "string - Método HTTP (GET, POST, etc.)",
+                                    "request_headers": "string - Headers de la solicitud HTTP",
+                                    "request_body": "string - Cuerpo de la solicitud (payload)",
+                                    "response_status": "number - Código de estado HTTP",
+                                    "response_headers": "string - Headers de la respuesta",
+                                    "response_body": "string - Cuerpo de la respuesta (evidencia)",
+                                    "response_time": "string - Tiempo de respuesta",
+                                    "vulnerability_indicator": "string - Indicador específico de vulnerabilidad",
+                                    "payload_type": "string - Tipo de payload utilizado",
+                                    "nuclei_template": "string - Template de Nuclei utilizado",
+                                    "exploitation_technique": "string - Técnica de explotación empleada"
+                                }
+                            ],
+                            "technical_details": {
+                                "total_requests": "number - Total de solicitudes realizadas",
+                                "successful_exploits": "number - Explotaciones exitosas",
+                                "templates_used": ["string - Templates de Nuclei utilizados"],
+                                "custom_templates_created": "number - Templates personalizados creados",
+                                "target_endpoints": ["string - Endpoints objetivo testeados"]
+                            }
                         },
                         "combined_assessment": "string"
                     },'''

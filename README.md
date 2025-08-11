@@ -1,6 +1,6 @@
 # 🛡️ Sistema de Validación de Vulnerabilidades con IA
 
-> **Sistema inteligente de análisis de vulnerabilidades que combina extracción de PDF, análisis estático y dinámico usando agentes de IA especializados**
+> **Sistema inteligente de análisis triage de vulnerabilidades que combina extracción de PDF, análisis estático y dinámico usando agentes de IA especializados**
 
 [![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://python.org)
 [![CrewAI](https://img.shields.io/badge/CrewAI-Latest-green.svg)](https://crewai.com)

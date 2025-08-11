@@ -132,17 +132,7 @@ class VulnerabilityValidationCrew:
             extraction_result = extraction_crew.kickoff()
             self.logger.info("Extracción completada")
             
-            # Procesar y guardar resultado de extracción en MongoDB
-            if self.use_mongodb and self.mongodb_client:
-                try:
-                    processed_extraction = self._process_extraction_result(str(extraction_result), pdf_path)
-                    self.mongodb_client.save_extraction_result(
-                        pdf_path, 
-                        processed_extraction, 
-                        {"timestamp": datetime.now().isoformat()}
-                    )
-                except Exception as e:
-                    self.logger.warning(f"Error guardando extracción en MongoDB: {e}")
+            # No guardar resultado de extracción en análisis completo - solo se guardará el triage final
             
             # Tarea 2: Análisis estático
             self.logger.info("Ejecutando análisis estático...")
@@ -162,18 +152,7 @@ class VulnerabilityValidationCrew:
             static_result = static_crew.kickoff()
             self.logger.info("Análisis estático completado")
             
-            # Guardar resultado de análisis estático en MongoDB
-            if self.use_mongodb and self.mongodb_client:
-                try:
-                    # Procesar resultado como JSON estructurado
-                    processed_static = self._process_analysis_result(str(static_result), "static")
-                    self.mongodb_client.save_static_analysis_result(
-                        source_code_path, 
-                        processed_static, 
-                        {"timestamp": datetime.now().isoformat()}
-                    )
-                except Exception as e:
-                    self.logger.warning(f"Error guardando análisis estático en MongoDB: {e}")
+            # No guardar resultado de análisis estático en análisis completo - solo se guardará el triage final
             
             # Tarea 3: Análisis dinámico
             self.logger.info("Ejecutando análisis dinámico...")
@@ -194,18 +173,7 @@ class VulnerabilityValidationCrew:
             dynamic_result = dynamic_crew.kickoff()
             self.logger.info("Análisis dinámico completado")
             
-            # Guardar resultado de análisis dinámico en MongoDB
-            if self.use_mongodb and self.mongodb_client:
-                try:
-                    # Procesar resultado como JSON estructurado
-                    processed_dynamic = self._process_analysis_result(str(dynamic_result), "dynamic")
-                    self.mongodb_client.save_dynamic_analysis_result(
-                        target_url, 
-                        processed_dynamic, 
-                        {"timestamp": datetime.now().isoformat()}
-                    )
-                except Exception as e:
-                    self.logger.warning(f"Error guardando análisis dinámico en MongoDB: {e}")
+            # No guardar resultado de análisis dinámico en análisis completo - solo se guardará el triage final
             
             # Tarea 4: Triage y consolidación
             self.logger.info("Ejecutando triage y consolidación...")

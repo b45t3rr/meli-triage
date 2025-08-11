@@ -294,9 +294,32 @@ class TriageAgent:
                             }
                         },
                         "dynamic_analysis": {
-                            "status": "string",
-                            "exploitation_success": "boolean",
-                            "key_evidence": ["string"]
+                            "status": "EXPLOTABLE|NO_EXPLOTABLE|PARCIAL|NO_TESTEABLE",
+                            "confidence": "High|Medium|Low",
+                            "exploitation_summary": "string - Resumen detallado de la explotación",
+                            "http_evidence": [
+                                {
+                                    "request_url": "string - URL completa de la solicitud",
+                                    "request_method": "string - Método HTTP (GET, POST, etc.)",
+                                    "request_headers": "string - Headers de la solicitud HTTP",
+                                    "request_body": "string - Cuerpo de la solicitud (payload)",
+                                    "response_status": "int - Código de estado HTTP",
+                                    "response_headers": "string - Headers de la respuesta",
+                                    "response_body": "string - Cuerpo de la respuesta (evidencia)",
+                                    "response_time": "string - Tiempo de respuesta",
+                                    "vulnerability_indicator": "string - Indicador específico de vulnerabilidad",
+                                    "payload_type": "string - Tipo de payload utilizado",
+                                    "nuclei_template": "string - Template de Nuclei utilizado",
+                                    "exploitation_technique": "string - Técnica de explotación empleada"
+                                }
+                            ],
+                            "technical_details": {
+                                "total_requests": "int - Total de solicitudes realizadas",
+                                "successful_exploits": "int - Explotaciones exitosas",
+                                "templates_used": ["string - Templates de Nuclei utilizados"],
+                                "custom_templates_created": "int - Templates personalizados creados",
+                                "target_endpoints": ["string - Endpoints objetivo testeados"]
+                            }
                         }
                     },
                     "impact_analysis": {

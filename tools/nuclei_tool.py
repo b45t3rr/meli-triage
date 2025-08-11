@@ -31,8 +31,15 @@ class NucleiTool(BaseTool):
     name: str = "Nuclei Dynamic Scanner"
     description: str = """
     Ejecuta análisis dinámico de vulnerabilidades usando Nuclei contra aplicaciones web.
-    Puede usar templates específicos, filtrar por tags/severidad, y crear templates personalizados.
-    Retorna resultados estructurados con detalles de vulnerabilidades encontradas.
+    ESPECIALIZADO en templates personalizados para vulnerabilidades específicas.
+    Prioriza templates YAML personalizados sobre templates genéricos.
+    Retorna resultados estructurados con evidencia HTTP detallada de explotación.
+    
+    Capacidades principales:
+    - Ejecución de templates personalizados creados específicamente para vulnerabilidades reportadas
+    - Validación dirigida de endpoints y parámetros específicos
+    - Detección de indicadores de explotación específicos por tipo de CWE
+    - Documentación completa de requests/responses HTTP para evidencia forense
     """
     args_schema: type[BaseModel] = NucleiInput
     
@@ -252,35 +259,42 @@ class NucleiTool(BaseTool):
                     if "cvss-score" in classification:
                         formatted_parts.append(f"CVSS Score: {classification['cvss-score']}")
                 
+                # Detalles HTTP para evidencia forense
+                request_data = result.get("request", "")
+                response_data = result.get("response", "")
+                
+                if request_data:
+                    formatted_parts.append(f"\n--- EVIDENCIA HTTP ---")
+                    formatted_parts.append(f"REQUEST HTTP:")
+                    formatted_parts.append(f"{request_data[:500]}{'...' if len(request_data) > 500 else ''}")
+                
+                if response_data:
+                    formatted_parts.append(f"\nRESPONSE HTTP:")
+                    formatted_parts.append(f"{response_data[:500]}{'...' if len(response_data) > 500 else ''}")
+                
+                # Información de timing
+                timestamp = result.get("timestamp", "")
+                if timestamp:
+                    formatted_parts.append(f"Timestamp: {timestamp}")
+                
                 # Extracted data si existe
                 extracted_results = result.get("extracted-results", [])
                 if extracted_results:
                     formatted_parts.append(f"Datos extraídos: {', '.join(extracted_results[:3])}")
+                
+                # Información del matcher que activó
+                matcher_name = result.get("matcher-name", "")
+                if matcher_name:
+                    formatted_parts.append(f"Matcher activado: {matcher_name}")
+                
+                # Tipo de template (personalizado vs genérico)
+                if "custom-" in template_id:
+                    formatted_parts.append(f"🎯 TEMPLATE PERSONALIZADO - Creado específicamente para esta vulnerabilidad")
+                else:
+                    formatted_parts.append(f"📋 Template genérico de Nuclei")
         
-        # Recomendaciones
-        formatted_parts.append("\n=== RECOMENDACIONES ===")
+        # Aviso cuando no hay vulnerabilidades
         if not nuclei_results:
-            formatted_parts.append("✅ No se encontraron vulnerabilidades con los templates aplicados.")
-        else:
-            critical_high = [r for r in nuclei_results 
-                           if r.get("info", {}).get("severity") in ["critical", "high"]]
-            if critical_high:
-                formatted_parts.append(f"🔴 {len(critical_high)} vulnerabilidades críticas/altas requieren atención inmediata.")
-            
-            medium = [r for r in nuclei_results 
-                     if r.get("info", {}).get("severity") == "medium"]
-            if medium:
-                formatted_parts.append(f"🟡 {len(medium)} vulnerabilidades medias deben ser priorizadas.")
-            
-            # Sugerencias específicas por tipo
-            sqli_results = [r for r in nuclei_results 
-                          if any("sql" in tag.lower() for tag in r.get("info", {}).get("tags", []))]
-            if sqli_results:
-                formatted_parts.append("💉 Se detectaron posibles SQL Injections - implementar prepared statements.")
-            
-            xss_results = [r for r in nuclei_results 
-                         if any("xss" in tag.lower() for tag in r.get("info", {}).get("tags", []))]
-            if xss_results:
-                formatted_parts.append("🔗 Se detectaron posibles XSS - implementar sanitización de entrada.")
+            formatted_parts.append("\n✅ No se encontraron vulnerabilidades con los templates aplicados.")
         
         return "\n".join(formatted_parts)

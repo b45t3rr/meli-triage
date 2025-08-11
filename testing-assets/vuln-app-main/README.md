@@ -18,7 +18,7 @@ This is a deliberately vulnerable web application designed for security testing 
 
 4. **IDOR (Insecure Direct Object Reference)**
    - Location: Document access and user management
-   - Example: Accessing `/document/1` without proper authorization
+   - Example: Accessing `/profile/2` without proper authorization
 
 5. **Path Traversal**
    - Location: File upload and download functionality

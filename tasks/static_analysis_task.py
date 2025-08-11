@@ -34,8 +34,16 @@ class StaticAnalysisTask:
         4. Para cada vulnerabilidad del reporte, determinar:
            - CONFIRMADA: Si el LLM encuentra evidencia correlacionada en Semgrep
            - NO_CONFIRMADA: Si el LLM no encuentra evidencia suficiente
-           - PARCIAL: Si el LLM encuentra patrones similares pero no exactos
+           - PROBABLE: Si el LLM encuentra patrones similares o indicios de la vulnerabilidad
+           - PARCIAL: Si el LLM encuentra evidencia parcial o incompleta
            - NO_APLICABLE: Si el tipo de vulnerabilidad no es detectable por análisis estático
+           
+        5. IMPORTANTE: Para vulnerabilidades con status PROBABLE, PARCIAL o CONFIRMADA, 
+           SIEMPRE incluir evidencia detallada en el campo 'evidence' con:
+           - Archivos específicos donde se encontraron patrones
+           - Números de línea exactos
+           - Fragmentos de código relevantes
+           - Mensajes de las reglas de Semgrep que coincidieron
         
         INSTRUCCIONES ESPECÍFICAS:
         - Primero ejecuta perform_targeted_scan() pasando el path del código fuente Y las vulnerabilidades extraídas
@@ -43,7 +51,7 @@ class StaticAnalysisTask:
         - Luego usa analyze_vulnerabilities_with_llm() pasando los resultados de Semgrep y las vulnerabilidades extraídas
         - El LLM debe proporcionar razonamiento detallado para cada correlación
         - Si el LLM no está disponible, usa el método de fallback automáticamente
-        - Las reglas dinámicas se crean automáticamente para: Path Traversal, SQL Injection, SSRF, XSS, IDOR
+        - Las reglas dinámicas se crean automáticamente para cualquier tipo de vulnerabilidad reportada: Path Traversal, SQL Injection, SSRF, XSS, IDOR, Command Injection, etc
         
         IMPORTANTE: 
         - Retorna ÚNICAMENTE un JSON válido con la estructura especificada.
@@ -64,7 +72,7 @@ class StaticAnalysisTask:
                 {
                     "vulnerability_id": "string (del reporte original)",
                     "vulnerability_title": "string",
-                    "validation_status": "CONFIRMADA|NO_CONFIRMADA|PARCIAL|NO_APLICABLE",
+                    "validation_status": "CONFIRMADA|NO_CONFIRMADA|PROBABLE|PARCIAL|NO_APLICABLE",
                     "confidence_level": "High|Medium|Low",
                     "semgrep_findings": [
                         {
@@ -82,7 +90,7 @@ class StaticAnalysisTask:
                         "match_reasoning": "string",
                         "false_positive_likelihood": "High|Medium|Low"
                     },
-                    "evidence": "string",
+                    "evidence": "string con evidencia detallada de los hallazgos encontrados",
                     "recommendations": "string"
                 }
             ],
