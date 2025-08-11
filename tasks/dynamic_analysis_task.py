@@ -61,7 +61,9 @@ class DynamicAnalysisTask:
         - Identificar indicadores de vulnerabilidades
         - Evitar falsos positivos
         
-        IMPORTANTE: Retorna ÚNICAMENTE un JSON válido con la estructura especificada.
+        IMPORTANTE: 
+        - Retorna ÚNICAMENTE un JSON válido con la estructura especificada.
+        - RESPONDE SIEMPRE EN ESPAÑOL. Todos los campos de texto, descripciones, mensajes y contenido deben estar en español.
         """
         
         expected_output = """

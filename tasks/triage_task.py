@@ -77,7 +77,9 @@ class TriageTask:
         - Proporcionar recomendaciones accionables
         - Identificar patrones y tendencias
         
-        IMPORTANTE: Retorna ÚNICAMENTE un JSON válido con la estructura especificada.
+        IMPORTANTE: 
+        - Retorna ÚNICAMENTE un JSON válido con la estructura especificada.
+        - RESPONDE SIEMPRE EN ESPAÑOL. Todos los campos de texto, descripciones, mensajes y contenido deben estar en español.
         """
         
         # Ajustar el expected_output según el tipo de análisis

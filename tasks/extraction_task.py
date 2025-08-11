@@ -42,8 +42,10 @@ class ExtractionTask:
         - Normalizar nombres de vulnerabilidades
         - Extraer información técnica relevante
         
-        IMPORTANTE: Retorna ÚNICAMENTE un JSON válido con la estructura especificada.
-        No incluyas texto adicional, explicaciones o comentarios fuera del JSON.
+        IMPORTANTE: 
+        - Retorna ÚNICAMENTE un JSON válido con la estructura especificada.
+        - No incluyas texto adicional, explicaciones o comentarios fuera del JSON.
+        - RESPONDE SIEMPRE EN ESPAÑOL. Todos los campos de texto, descripciones, mensajes y contenido deben estar en español.
         """
         
         expected_output = """

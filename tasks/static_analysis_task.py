@@ -45,7 +45,9 @@ class StaticAnalysisTask:
         - Si el LLM no está disponible, usa el método de fallback automáticamente
         - Las reglas dinámicas se crean automáticamente para: Path Traversal, SQL Injection, SSRF, XSS, IDOR
         
-        IMPORTANTE: Retorna ÚNICAMENTE un JSON válido con la estructura especificada.
+        IMPORTANTE: 
+        - Retorna ÚNICAMENTE un JSON válido con la estructura especificada.
+        - RESPONDE SIEMPRE EN ESPAÑOL. Todos los campos de texto, descripciones, mensajes y contenido deben estar en español.
         """
         
         expected_output = """
