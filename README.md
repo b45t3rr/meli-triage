@@ -1,295 +1,365 @@
-# Sistema de Validación de Vulnerabilidades con CrewAI
+# 🛡️ Sistema de Validación de Vulnerabilidades con IA
 
-Sistema GenIA que utiliza un framework de agentes (CrewAI) para validar vulnerabilidades de reportes PDF mediante análisis estático y dinámico.
+> **Sistema inteligente de análisis de vulnerabilidades que combina extracción de PDF, análisis estático y dinámico usando agentes de IA especializados**
 
-## 🤖 Soporte Multi-LLM
+[![Python](https://img.shields.io/badge/Python-3.8+-blue.svg)](https://python.org)
+[![CrewAI](https://img.shields.io/badge/CrewAI-Latest-green.svg)](https://crewai.com)
+[![License](https://img.shields.io/badge/License-MIT-yellow.svg)](LICENSE)
 
-El sistema soporta múltiples proveedores de modelos LLM:
-- **OpenAI**: GPT-4o, GPT-4o-mini, GPT-4, O1, etc.
-- **Anthropic**: Claude 3.5 Sonnet, Claude 3.5 Haiku, Claude 3 Opus
-- **Google**: Gemini 2.5 Flash, Gemini 1.5 Pro/Flash
-- **DeepSeek**: DeepSeek Chat, DeepSeek Coder, DeepSeek Reasoner
-- **Groq**: Llama 3.3, Llama 3.1, Mixtral, Gemma2
-- **Mistral**: Mistral Large/Medium/Small, Open-Mistral
-- **xAI**: Grok Beta, Grok 2/2-mini (próximamente)
+## 🎯 ¿Qué hace este sistema?
 
-```bash
-# Ver modelos disponibles
-python main.py --list-models
+Este sistema automatiza la validación de vulnerabilidades de seguridad mediante un enfoque de **múltiples agentes de IA** que trabajan en conjunto:
 
-# Usar modelo específico
-python main.py --model gpt-4o-mini --pdf report.pdf --source ./code --url https://example.com
-python main.py --model anthropic:claude-3-5-sonnet-20241022 --pdf report.pdf --extract-only
-```
+1. **📄 Extrae** vulnerabilidades de reportes PDF
+2. **🔍 Analiza** código fuente estáticamente con Semgrep
+3. **🎯 Prueba** aplicaciones dinámicamente con Nuclei
+4. **📊 Consolida** resultados en un reporte final inteligente
 
-📖 **Documentación completa**: [README_LLM.md](README_LLM.md)
+## ✨ Características Principales
 
-## 🏗️ Arquitectura
+### 🤖 Soporte Multi-LLM
+Compatible con los mejores modelos de IA del mercado:
+- **OpenAI**: GPT-5, GPT-4o, GPT-4o-mini, O1, GPT-4
+- **Anthropic**: Claude 3.5 Sonnet, Claude 3.7 Sonnet
+- **Google**: Gemini 2.5 Flash, Gemini 1.5 Pro
+- **DeepSeek**: DeepSeek Chat, DeepSeek Coder
+- **Groq**: Llama 3.3, Mixtral, Gemma2
+- **Mistral**: Mistral Large/Medium/Small
+- **xAI**: grok-4, grok-3, grok-3-mini
 
-El sistema está compuesto por 4 agentes especializados:
+### 🏗️ Arquitectura de 4 Agentes Especializados
 
-### 1. 🔍 Agente Extractor
-- **Función**: Extrae y analiza vulnerabilidades de reportes PDF
-- **Herramienta**: PDFExtractorTool (PyPDF2)
-- **Salida**: JSON estructurado con vulnerabilidades categorizadas
-- **IA**: Asigna automáticamente títulos, CWE, categorías OWASP
+| Agente | Función | Herramienta | Especialidad |
+|--------|---------|-------------|-------------|
+| 🔍 **Extractor** | Analiza PDFs | PyPDF2 | Categorización automática con CWE/OWASP |
+| 🔧 **Estático** | Análisis de código | Semgrep | Correlación de vulnerabilidades en código |
+| 🎯 **Dinámico** | Pruebas en vivo | Nuclei | Templates personalizados por vulnerabilidad |
+| 📊 **Triage** | Consolidación | IA | Validación y reclasificación inteligente |
 
-### 2. 🔧 Agente Estático
-- **Función**: Valida vulnerabilidades mediante análisis estático
-- **Herramienta**: SemgrepTool (Semgrep)
-- **Entrada**: Resultados del agente extractor + directorio de código
-- **IA**: Correlaciona hallazgos con vulnerabilidades reportadas
+### 🚀 Modos de Ejecución Flexibles
+- **Completo**: Análisis end-to-end
+- **Solo extracción**: Procesar únicamente PDFs
+- **Solo estático**: Análisis de código fuente
+- **Solo dinámico**: Pruebas en aplicaciones web
 
-### 3. 🎯 Agente Dinámico
-- **Función**: Valida vulnerabilidades mediante análisis dinámico
-- **Herramienta**: NucleiTool (Nuclei)
-- **Entrada**: Resultados de extracción y análisis estático + URL objetivo
-- **IA**: Crea templates de Nuclei específicos para cada vulnerabilidad
-
-### 4. 📊 Agente de Triage
-- **Función**: Consolida resultados y genera reporte final
-- **Entrada**: Resultados de todos los agentes anteriores
-- **IA**: Valida existencia, reclasifica severidad, genera recomendaciones
-
-## 📁 Estructura del Proyecto
-
-```
-test3/
-├── agents/                 # Agentes de CrewAI
-│   ├── __init__.py
-│   ├── extractor_agent.py  # Agente extractor de PDF
-│   ├── static_agent.py     # Agente de análisis estático
-│   ├── dynamic_agent.py    # Agente de análisis dinámico
-│   └── triage_agent.py     # Agente de triage
-├── tools/                  # Herramientas especializadas
-│   ├── __init__.py
-│   ├── pdf_tool.py         # Extracción de PDF
-│   ├── semgrep_tool.py     # Análisis estático
-│   └── nuclei_tool.py      # Análisis dinámico
-├── tasks/                  # Definiciones de tareas
-│   ├── __init__.py
-│   ├── extraction_task.py  # Tarea de extracción
-│   ├── static_analysis_task.py  # Tarea de análisis estático
-│   ├── dynamic_analysis_task.py # Tarea de análisis dinámico
-│   └── triage_task.py      # Tarea de triage
-├── main.py                 # Punto de entrada principal
-├── requirements.txt        # Dependencias
-└── README.md              # Este archivo
-```
-
-## 🚀 Instalación
+## 📦 Instalación Rápida
 
 ### Prerrequisitos
-
-1. **Python 3.8+**
-2. **OpenAI API Key**
-3. **Semgrep** (para análisis estático)
-4. **Nuclei** (para análisis dinámico)
-
-### Instalación de Dependencias
-
 ```bash
-# Clonar o descargar el proyecto
+# Python 3.8 o superior
+python --version
+
+# Git (para clonar el repositorio)
+git --version
+```
+
+### 1. Clonar e Instalar
+```bash
+# Clonar el repositorio
+git clone <repository-url>
 cd test3
 
 # Instalar dependencias de Python
 pip install -r requirements.txt
 
-# Instalar Semgrep
+# Instalar herramientas de análisis
 pip install semgrep
-# O usando el instalador oficial:
-curl -sSL https://semgrep.dev/install | sh
-
-# Instalar Nuclei
-# En Windows (usando Go):
-go install -v github.com/projectdiscovery/nuclei/v2/cmd/nuclei@latest
-
-# O descargar desde releases:
-# https://github.com/projectdiscovery/nuclei/releases
 ```
 
-### Configuración
-
-1. **Configurar OpenAI API Key**:
+### 2. Instalar Nuclei
 ```bash
-# Windows PowerShell
-$env:OPENAI_API_KEY="tu-api-key-aqui"
+# Opción 1: Usando Go
+go install -v github.com/projectdiscovery/nuclei/v2/cmd/nuclei@latest
 
-# Windows CMD
-set OPENAI_API_KEY=tu-api-key-aqui
+# Opción 2: Descargar binario
+# Visita: https://github.com/projectdiscovery/nuclei/releases
+```
 
-# Linux/Mac
+### 3. Configurar API Keys
+```bash
+# Crear archivo .env
+echo "OPENAI_API_KEY=tu-api-key-aqui" > .env
+
+# O exportar como variable de entorno
 export OPENAI_API_KEY="tu-api-key-aqui"
 ```
 
-2. **Preparar archivos de entrada**:
-   - Coloca tu reporte PDF como `sample_report.pdf`
-   - Crea directorio `source_code/` con el código a analizar
-   - Configura la URL objetivo en `main.py`
+## 🚀 Uso
 
-## 📖 Uso
-
-### Ejecución con Argumentos (Recomendado)
-
+### Comando Básico
 ```bash
-# Uso básico (análisis completo)
+# Análisis completo
 python main.py --pdf reporte.pdf --source ./codigo --url https://ejemplo.com
-
-# Con argumentos cortos
-python main.py -p vuln_report.pdf -s /ruta/al/codigo -u http://localhost:8080
-
-# Solo extracción de PDF
-python main.py --pdf report.pdf --extract-only
-
-# Solo análisis estático
-python main.py --pdf report.pdf --source ./codigo --static-only
-
-# Solo análisis dinámico
-python main.py --pdf report.pdf --url https://ejemplo.com --dynamic-only
-
-# Especificando directorio de salida
-python main.py --pdf report.pdf --source ./src --url https://app.com --output ./mis_resultados
-
-# Con API key como argumento
-python main.py --pdf report.pdf --source ./src --url https://app.com --api-key tu-openai-key
-
-# Guardar resultados en archivos JSON
-python main.py --pdf report.pdf --source ./src --url https://app.com --save-output
 ```
 
-### Argumentos Disponibles
+### Ejemplos Prácticos
 
-**Argumentos principales:**
-- `-p, --pdf` (requerido): Ruta al archivo PDF del reporte
-- `-s, --source`: Directorio del código fuente (requerido para análisis estático)
-- `-u, --url`: URL objetivo para pruebas dinámicas (requerido para análisis dinámico)
-- `-o, --output` (opcional): Directorio de salida (default: ./results)
-- `--model` (opcional): Modelo LLM a usar (default: gpt-4o-mini)
-- `--api-key` (opcional): OpenAI API Key
+#### 📄 Solo Extracción de PDF
+```bash
+python main.py --pdf vulnerability_report.pdf --extract-only
+```
 
-**Modos de ejecución:**
-- `--extract-only`: Ejecutar solo extracción de PDF
-- `--static-only`: Ejecutar solo análisis estático (requiere --source)
-- `--dynamic-only`: Ejecutar solo análisis dinámico (requiere --url)
-- Sin modo específico: Ejecutar análisis completo (requiere --source y --url)
+#### 🔍 Solo Análisis Estático
+```bash
+python main.py --pdf report.pdf --source ./src --static-only
+```
 
-**Opciones adicionales:**
-- `--save-output`: Guardar resultados en archivos JSON
-- `--list-models`: Mostrar modelos LLM disponibles
-- `--help`: Mostrar ayuda completa
+#### 🎯 Solo Análisis Dinámico
+```bash
+python main.py --pdf report.pdf --url https://app.ejemplo.com --dynamic-only
+```
 
-### Ver Ayuda
+#### 🤖 Usar Modelo Específico
+```bash
+# GPT 5 mini
+python main.py --model gpt-5-mini --pdf report.pdf --extract-only
 
+# Grok 3 Mini
+python main.py --model grok-3-mini --pdf report.pdf --source ./src --url https://app.com
+
+# DeepSeek chat
+python main.py --model deepseek-chat --pdf report.pdf --static-only --source ./code
+```
+
+#### 💾 Guardar Resultados
+```bash
+python main.py --pdf report.pdf --source ./src --url https://app.com --save-output --output ./mis_resultados
+```
+
+### Ver Modelos Disponibles
+```bash
+python main.py --list-models
+```
+
+### Ayuda Completa
 ```bash
 python main.py --help
 ```
 
-### Flujo de Ejecución
+## 📊 Resultados y Salidas
 
-1. **Extracción**: Analiza el PDF y extrae vulnerabilidades
-2. **Análisis Estático**: Valida con Semgrep en el código fuente
-3. **Análisis Dinámico**: Prueba con Nuclei en la URL objetivo
-4. **Triage**: Consolida resultados y genera reporte final
+El sistema genera archivos estructurados en el directorio `results/`:
 
-## 📊 Resultados
+```
+results/
+├── validation_result_20240115_103000.json    # Resultado consolidado
+├── extraction_20240115_103000.json           # Vulnerabilidades extraídas
+├── static_analysis_20240115_103000.json      # Resultados Semgrep
+├── dynamic_analysis_20240115_103000.json     # Resultados Nuclei
+└── final_report_20240115_103000.json         # Reporte final de triage
+```
 
-El sistema genera varios archivos de salida en el directorio `results/`:
-
-- `validation_result_YYYYMMDD_HHMMSS.json` - Resultado consolidado
-- `extraction_YYYYMMDD_HHMMSS.json` - Vulnerabilidades extraídas
-- `static_analysis_YYYYMMDD_HHMMSS.json` - Resultados de Semgrep
-- `dynamic_analysis_YYYYMMDD_HHMMSS.json` - Resultados de Nuclei
-- `final_report_YYYYMMDD_HHMMSS.json` - Reporte final de triage
-
-### Estructura de Salida
-
+### Estructura de Salida JSON
 ```json
 {
-  "extraction_results": "...",
-  "static_analysis_results": "...",
-  "dynamic_analysis_results": "...",
-  "final_triage_report": "...",
+  "extraction_results": {
+    "vulnerabilities": [
+      {
+        "title": "SQL Injection en login",
+        "cwe": "CWE-89",
+        "owasp_category": "A03:2021 – Injection",
+        "severity": "High",
+        "description": "...",
+        "location": "login.php línea 45"
+      }
+    ]
+  },
+  "static_analysis_results": [...],
+  "dynamic_analysis_results": [...],
+  "final_triage_report": {
+    "validated_vulnerabilities": [...],
+    "false_positives": [...],
+    "recommendations": [...]
+  },
   "metadata": {
-    "pdf_path": "./sample_report.pdf",
-    "source_code_path": "./source_code",
-    "target_url": "http://localhost:8080",
     "analysis_date": "2024-01-15T10:30:00",
-    "system_version": "1.0.0"
+    "model_used": "gpt-4o-mini",
+    "execution_time": "45.2s"
   }
 }
 ```
 
-## 🔧 Personalización
+## 🏗️ Estructura del Proyecto
 
-### Modificar Agentes
+```
+test3/
+├── 🤖 agents/                 # Agentes de IA especializados
+│   ├── extractor_agent.py     # Extracción y categorización de PDF
+│   ├── static_agent.py        # Análisis estático con Semgrep
+│   ├── dynamic_agent.py       # Análisis dinámico con Nuclei
+│   └── triage_agent.py        # Consolidación y triage inteligente
+├── 🛠️ tools/                  # Herramientas especializadas
+│   ├── pdf_tool.py            # Extracción de texto de PDF
+│   ├── semgrep_tool.py        # Interfaz con Semgrep
+│   └── nuclei_tool.py         # Interfaz con Nuclei
+├── 📋 tasks/                  # Definiciones de tareas
+│   ├── extraction_task.py     # Tarea de extracción
+│   ├── static_analysis_task.py # Tarea de análisis estático
+│   ├── dynamic_analysis_task.py # Tarea de análisis dinámico
+│   └── triage_task.py         # Tarea de triage
+├── ⚙️ config/                 # Configuraciones
+│   └── llm_config.py          # Configuración multi-LLM
+├── 🗄️ database/               # Conectores de base de datos
+│   ├── mongodb_client.py      # Cliente MongoDB
+│   └── mongodb_utils.py       # Utilidades MongoDB
+├── 🐳 docker-compose.yml      # Configuración Docker
+├── 📄 main.py                 # Punto de entrada principal
+├── 📦 requirements.txt        # Dependencias Python
+└── 📚 README.md              # Este archivo
+```
 
-Cada agente puede ser personalizado editando su archivo correspondiente en `agents/`:
+## 🔧 Configuración Avanzada
 
-- **Rol y objetivo**: Modifica `role` y `goal`
-- **Backstory**: Ajusta el contexto del agente
-- **Herramientas**: Añade o quita herramientas
+### Variables de Entorno
+```bash
+# APIs de LLM
+OPENAI_API_KEY=sk-...
+ANTHROPIC_API_KEY=sk-ant-...
+GOOGLE_API_KEY=AI...
+DEEPSEEK_API_KEY=sk-...
+GROQ_API_KEY=gsk_...
+MISTRAL_API_KEY=...
 
-### Añadir Nuevas Herramientas
+# MongoDB (opcional)
+MONGODB_URI=mongodb://localhost:27017
+MONGODB_DATABASE=vulnerability_db
 
-1. Crea una nueva clase en `tools/`
-2. Hereda de `BaseTool` de CrewAI
-3. Implementa el método `_run()`
-4. Añade la herramienta al agente correspondiente
+# Configuraciones adicionales
+LOG_LEVEL=INFO
+OUTPUT_FORMAT=json
+```
 
-### Modificar Tareas
+### Personalización de Agentes
 
-Las tareas se definen en `tasks/` y pueden ser personalizadas:
+Cada agente puede ser personalizado editando su archivo correspondiente:
 
-- **Descripción**: Instrucciones detalladas para el agente
-- **Salida esperada**: Formato y contenido de la respuesta
-- **Contexto**: Dependencias de otras tareas
+```python
+# agents/extractor_agent.py
+self.agent = Agent(
+    role="Tu rol personalizado",
+    goal="Tu objetivo específico",
+    backstory="Contexto personalizado del agente",
+    tools=[self.pdf_tool],
+    llm=self.llm
+)
+```
 
 ## 🐛 Solución de Problemas
 
 ### Errores Comunes
 
-1. **"OPENAI_API_KEY no está configurada"**
-   - Verifica que la variable de entorno esté configurada
-   - Reinicia la terminal después de configurarla
+#### ❌ "OPENAI_API_KEY no está configurada"
+```bash
+# Solución
+export OPENAI_API_KEY="tu-api-key"
+# O crear archivo .env con la clave
+```
 
-2. **"Archivo PDF no encontrado"**
-   - Verifica que el archivo existe en la ruta especificada
-   - Usa rutas absolutas si hay problemas con rutas relativas
+#### ❌ "Semgrep no encontrado"
+```bash
+# Solución
+pip install semgrep
+# Verificar instalación
+semgrep --version
+```
 
-3. **"Semgrep no encontrado"**
-   - Instala Semgrep: `pip install semgrep`
-   - Verifica que esté en el PATH: `semgrep --version`
+#### ❌ "Nuclei no encontrado"
+```bash
+# Solución
+go install -v github.com/projectdiscovery/nuclei/v2/cmd/nuclei@latest
+# Verificar instalación
+nuclei -version
+```
 
-4. **"Nuclei no encontrado"**
-   - Instala Nuclei desde releases de GitHub
-   - Añade al PATH del sistema
-   - Verifica: `nuclei -version`
+#### ❌ "Archivo PDF no encontrado"
+```bash
+# Usar ruta absoluta
+python main.py --pdf /ruta/completa/al/archivo.pdf
+```
 
-### Logs
+### Logs y Debugging
 
-El sistema genera logs en:
-- Consola (tiempo real)
-- Archivo `vulnerability_validation.log`
+El sistema genera logs detallados:
+- **Consola**: Información en tiempo real
+- **Archivo**: `vulnerability_validation.log`
+
+```bash
+# Ver logs en tiempo real
+tail -f vulnerability_validation.log
+```
+
+## 🚀 Casos de Uso
+
+### 1. Auditoría de Seguridad Automatizada
+```bash
+# Validar reporte de pentest
+python main.py --pdf pentest_report.pdf --source ./webapp --url https://app.empresa.com
+```
+
+### 2. Análisis de Código Pre-Producción
+```bash
+# Solo análisis estático antes de deploy
+python main.py --pdf security_requirements.pdf --source ./src --static-only
+```
+
+### 3. Validación de Vulnerabilidades Reportadas
+```bash
+# Verificar si vulnerabilidades siguen existiendo
+python main.py --pdf bug_bounty_report.pdf --url https://staging.app.com --dynamic-only
+```
+
+### 4. Procesamiento Batch de Reportes
+```bash
+# Procesar múltiples reportes
+for pdf in reports/*.pdf; do
+    python main.py --pdf "$pdf" --extract-only --output "./results/$(basename "$pdf" .pdf)"
+done
+```
 
 ## 🤝 Contribución
 
-1. Fork el proyecto
-2. Crea una rama para tu feature (`git checkout -b feature/nueva-funcionalidad`)
-3. Commit tus cambios (`git commit -am 'Añadir nueva funcionalidad'`)
-4. Push a la rama (`git push origin feature/nueva-funcionalidad`)
-5. Crea un Pull Request
+¡Las contribuciones son bienvenidas! Por favor:
+
+1. **Fork** el proyecto
+2. **Crea** una rama para tu feature (`git checkout -b feature/nueva-funcionalidad`)
+3. **Commit** tus cambios (`git commit -am 'Añadir nueva funcionalidad'`)
+4. **Push** a la rama (`git push origin feature/nueva-funcionalidad`)
+5. **Crea** un Pull Request
+
+### Áreas de Contribución
+- 🔧 Nuevas herramientas de análisis
+- 🤖 Agentes especializados adicionales
+- 🌐 Soporte para más proveedores LLM
+- 📊 Mejoras en reportes y visualización
+- 🐳 Containerización y deployment
 
 ## 📝 Licencia
 
-Este proyecto está bajo la Licencia MIT. Ver archivo `LICENSE` para más detalles.
+Este proyecto está bajo la Licencia MIT. Ver archivo [LICENSE](LICENSE) para más detalles.
 
 ## 🔗 Enlaces Útiles
 
-- [CrewAI Documentation](https://docs.crewai.com/)
-- [Semgrep Documentation](https://semgrep.dev/docs/)
-- [Nuclei Documentation](https://nuclei.projectdiscovery.io/)
-- [OpenAI API Documentation](https://platform.openai.com/docs/)
+- 📚 [Documentación CrewAI](https://docs.crewai.com/)
+- 🔍 [Documentación Semgrep](https://semgrep.dev/docs/)
+- 🎯 [Documentación Nuclei](https://nuclei.projectdiscovery.io/)
+- 🤖 [OpenAI API](https://platform.openai.com/docs/)
+- 🧠 [Anthropic Claude](https://docs.anthropic.com/)
+- 🌟 [Google Gemini](https://ai.google.dev/)
 
 ## 📞 Soporte
 
-Para reportar bugs o solicitar features, por favor crea un issue en el repositorio del proyecto.
+¿Necesitas ayuda? 
+
+- 🐛 **Bugs**: Crea un [issue](../../issues)
+- 💡 **Features**: Crea un [feature request](../../issues)
+- 💬 **Preguntas**: Inicia una [discusión](../../discussions)
+
+---
+
+<div align="center">
+
+**⭐ Si este proyecto te resulta útil, ¡dale una estrella! ⭐**
+
+*Desarrollado con ❤️ para la comunidad de seguridad*
+
+</div>
