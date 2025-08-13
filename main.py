@@ -7,6 +7,7 @@ Arquitectura de 4 agentes para validar vulnerabilidades mediante análisis está
 import os
 import sys
 import json
+import re
 import logging
 import argparse
 from datetime import datetime
@@ -29,7 +30,8 @@ from agents.triage_agent import TriageAgent
 # Imports de herramientas
 from tools.pdf_tool import PDFExtractorTool
 from tools.semgrep_tool import SemgrepTool
-from tools.nuclei_tool import NucleiTool
+
+# Removed CurlTool and NmapTool - DynamicAgent now uses GenericLinuxCommandTool internally
 
 # Imports de tareas
 from tasks.extraction_task import ExtractionTask
@@ -87,12 +89,11 @@ class VulnerabilityValidationCrew:
         # Inicializar herramientas
         self.pdf_tool = PDFExtractorTool()
         self.semgrep_tool = SemgrepTool()
-        self.nuclei_tool = NucleiTool()
         
         # Inicializar agentes con el modelo LLM configurado
         self.extractor_agent = ExtractorAgent(self.pdf_tool, llm=self.llm)
         self.static_agent = StaticAgent(self.semgrep_tool, llm=self.llm)
-        self.dynamic_agent = DynamicAgent(self.nuclei_tool, llm=self.llm)
+        self.dynamic_agent = DynamicAgent(llm=self.llm)
         self.triage_agent = TriageAgent(llm=self.llm)
     
     def __del__(self):
@@ -251,54 +252,134 @@ class VulnerabilityValidationCrew:
         try:
             import re
             
+            # Verificar si el resultado está vacío
+            if not extraction_result or extraction_result.strip() == "":
+                self.logger.warning("Resultado de extracción vacío")
+                return {
+                    "pdf_path": pdf_path,
+                    "vulnerabilities_reported": 0,
+                    "vulnerabilities": [],
+                    "raw_result": extraction_result,
+                    "processing_error": "Resultado de extracción vacío"
+                }
+            
             # Limpiar el string JSON removiendo marcadores de markdown
             clean_json = extraction_result.strip()
+            
+            # Log para depuración
+            self.logger.debug(f"Resultado de extracción original (primeros 200 chars): {extraction_result[:200]}...")
+            
+            # Remover marcadores de markdown más robustamente
             if clean_json.startswith('```json'):
                 clean_json = clean_json[7:]  # Remover ```json
+            elif clean_json.startswith('```'):
+                clean_json = clean_json[3:]  # Remover ``` simple
+            
             if clean_json.endswith('```'):
                 clean_json = clean_json[:-3]  # Remover ```
+            
             clean_json = clean_json.strip()
+            
+            # Buscar JSON válido si aún hay problemas
+            if not clean_json.startswith('{'):
+                # Buscar el primer { y último }
+                start_idx = clean_json.find('{')
+                end_idx = clean_json.rfind('}') + 1
+                if start_idx != -1 and end_idx > start_idx:
+                    clean_json = clean_json[start_idx:end_idx]
+                    self.logger.debug(f"JSON extraído por búsqueda de llaves: {clean_json[:100]}...")
+            
+            # Verificar si después de limpiar queda algo
+            if not clean_json:
+                self.logger.warning("Resultado de extracción vacío después de limpiar marcadores markdown")
+                return {
+                    "pdf_path": pdf_path,
+                    "vulnerabilities_reported": 0,
+                    "vulnerabilities": [],
+                    "raw_result": extraction_result,
+                    "processing_error": "Resultado vacío después de limpiar markdown"
+                }
+            
+            # Log del JSON limpio para depuración
+            self.logger.debug(f"JSON limpio (primeros 200 chars): {clean_json[:200]}...")
+            
+            # Limpiar escapes Unicode problemáticos antes de parsear
+            clean_json = self._fix_unicode_escapes(clean_json)
             
             # Parsear el JSON del resultado
             result_json = json.loads(clean_json)
             
-            # Extraer vulnerabilidades y metadata
+            # Extraer vulnerabilidades y metadata simplificados
             vulnerabilities = result_json.get('vulnerabilities', [])
             metadata = result_json.get('metadata', {})
             
-            # Estructurar datos para MongoDB
+            # Estructurar datos simplificados para MongoDB
             processed_data = {
                 "pdf_path": pdf_path,
                 "vulnerabilities_reported": len(vulnerabilities),
-                "vulnerabilities": vulnerabilities,
+                "vulnerabilities": vulnerabilities,  # Solo contiene: id, title, severity, type, affected_url, detailed_poc, evidences, remediation
                 "document_metadata": {
                     "report_title": metadata.get('report_title', 'N/A'),
                     "scan_date": metadata.get('scan_date', 'N/A'),
-                    "target_info": metadata.get('target_info', 'N/A'),
-                    "total_vulnerabilities": metadata.get('total_vulnerabilities', len(vulnerabilities))
-                },
-                "extraction_summary": {
-                    "critical_count": len([v for v in vulnerabilities if v.get('severity', '').lower() == 'critical']),
-                    "high_count": len([v for v in vulnerabilities if v.get('severity', '').lower() == 'high']),
-                    "medium_count": len([v for v in vulnerabilities if v.get('severity', '').lower() == 'medium']),
-                    "low_count": len([v for v in vulnerabilities if v.get('severity', '').lower() == 'low']),
-                    "categories": list(set([v.get('category', 'Unknown') for v in vulnerabilities])),
-                    "cwe_types": list(set([v.get('cwe_id', 'Unknown') for v in vulnerabilities if v.get('cwe_id')]))
+                    "target_info": metadata.get('target_info', 'N/A')
                 }
             }
             
+            self.logger.info(f"Extracción procesada exitosamente: {len(vulnerabilities)} vulnerabilidades encontradas")
             return processed_data
             
-        except (json.JSONDecodeError, KeyError) as e:
-            self.logger.warning(f"Error procesando resultado de extracción: {e}")
+        except json.JSONDecodeError as e:
+            self.logger.error(f"Error de JSON en resultado de extracción: {e}")
+            self.logger.error(f"Contenido que causó el error (primeros 500 chars): {extraction_result[:500]}...")
             # Fallback: estructura básica
             return {
                 "pdf_path": pdf_path,
                 "vulnerabilities_reported": 0,
                 "vulnerabilities": [],
                 "raw_result": extraction_result,
-                "processing_error": str(e)
+                "processing_error": f"Error JSON: {str(e)}"
             }
+        except Exception as e:
+            self.logger.error(f"Error inesperado procesando resultado de extracción: {e}")
+            self.logger.error(f"Contenido del resultado: {extraction_result[:500]}...")
+            # Fallback: estructura básica
+            return {
+                "pdf_path": pdf_path,
+                "vulnerabilities_reported": 0,
+                "vulnerabilities": [],
+                "raw_result": extraction_result,
+                "processing_error": f"Error inesperado: {str(e)}"
+            }
+    
+    def _fix_unicode_escapes(self, json_string: str) -> str:
+        """Corrige escapes Unicode problemáticos en el JSON"""
+        
+        # Función para reemplazar escapes Unicode inválidos
+        def fix_escape(match):
+            escape_seq = match.group(0)
+            try:
+                # Intentar decodificar el escape
+                decoded = escape_seq.encode().decode('unicode_escape')
+                # Re-escapar correctamente para JSON
+                return json.dumps(decoded)[1:-1]  # Remover las comillas
+            except (UnicodeDecodeError, ValueError):
+                # Si falla, escapar los caracteres problemáticos
+                return escape_seq.replace('\\', '\\\\')
+        
+        # Buscar y corregir escapes Unicode problemáticos
+        # Patrón para encontrar \uXXXX donde XXXX no son 4 dígitos hexadecimales válidos
+        pattern = r'\\u[0-9a-fA-F]{0,3}(?![0-9a-fA-F])'
+        json_string = re.sub(pattern, fix_escape, json_string)
+        
+        # Escapar caracteres problemáticos comunes
+        json_string = json_string.replace('\\n', '\\\\n')
+        json_string = json_string.replace('\\t', '\\\\t')
+        json_string = json_string.replace('\\r', '\\\\r')
+        
+        # Corregir escapes de barra invertida problemáticos
+        json_string = re.sub(r'(?<!\\)\\(?!["\\/bfnrt]|u[0-9a-fA-F]{4})', r'\\\\', json_string)
+        
+        return json_string
     
     def _process_analysis_result(self, analysis_result: str, analysis_type: str) -> List[Dict[str, Any]]:
         """Procesa resultados de análisis estático o dinámico para formato MongoDB válido"""
@@ -314,17 +395,24 @@ class VulnerabilityValidationCrew:
             # Parsear el JSON del resultado
             result_json = json.loads(clean_json)
             
-            # Extraer hallazgos/vulnerabilidades según el tipo
-            if analysis_type == "static":
-                findings = result_json.get('findings', [])
-                if not findings:
-                    findings = result_json.get('vulnerabilities', [])
-                return findings
-            elif analysis_type == "dynamic":
-                vulnerabilities = result_json.get('vulnerabilities', [])
-                if not vulnerabilities:
-                    vulnerabilities = result_json.get('findings', [])
-                return vulnerabilities
+            # Manejar si el resultado es directamente una lista o un objeto
+            if isinstance(result_json, list):
+                # Si es una lista directamente, devolverla
+                return result_json
+            elif isinstance(result_json, dict):
+                # Si es un objeto, extraer hallazgos/vulnerabilidades según el tipo
+                if analysis_type == "static":
+                    findings = result_json.get('findings', [])
+                    if not findings:
+                        findings = result_json.get('vulnerabilities', [])
+                    return findings
+                elif analysis_type == "dynamic":
+                    vulnerabilities = result_json.get('vulnerabilities', [])
+                    if not vulnerabilities:
+                        vulnerabilities = result_json.get('findings', [])
+                    return vulnerabilities
+                else:
+                    return []
             else:
                 return []
                 
@@ -355,7 +443,10 @@ class VulnerabilityValidationCrew:
             # Extraer información del resultado de extracción original
             extraction_data = self._process_extraction_result(extraction_result, pdf_path)
             
-            # Estructurar datos consolidados para MongoDB
+            # Extraer datos del validation_summary si existe
+            validation_summary = triage_json.get('validation_summary', {})
+            
+            # Estructurar datos simplificados para MongoDB
             processed_data = {
                 "analysis_metadata": {
                     "pdf_path": pdf_path,
@@ -363,64 +454,13 @@ class VulnerabilityValidationCrew:
                     "target_url": target_url,
                     "analysis_timestamp": datetime.now().isoformat()
                 },
-                "vulnerabilities_reported": extraction_data.get('vulnerabilities_reported', 0),
-                "vulnerabilities_confirmed": 0,  # Se calculará a partir del análisis
-                "vulnerabilities_analysis": [],
-                "executive_summary": triage_json.get('executive_summary', {}),
-                "methodology": triage_json.get('methodology', {}),
-                "recommendations": triage_json.get('recommendations', {}),
-                "metrics": triage_json.get('metrics', {}),
-                "validation_summary": {
-                    "total_reported": extraction_data.get('vulnerabilities_reported', 0),
-                    "confirmed": 0,
-                    "likely": 0,
-                    "possible": 0,
-                    "false_positives": 0,
-                    "validation_rate": 0.0
-                }
+                "total_vulnerabilities": validation_summary.get('total_vulnerabilities', triage_json.get('total_vulnerabilities', 0)),
+                "confirmed_vulnerabilities": validation_summary.get('confirmed_vulnerabilities', triage_json.get('confirmed_vulnerabilities', 0)),
+                "false_positives": validation_summary.get('false_positives', triage_json.get('false_positives', 0)),
+                "risk_level": validation_summary.get('overall_risk_level', triage_json.get('risk_level', 'Unknown')),
+                "vulnerability_assessments": triage_json.get('vulnerability_assessments', []),  # Solo contiene: vulnerability_id, title, type, original_severity, final_status, final_severity, evidence_summary, remediation
+                "remediation_recommendations": triage_json.get('remediation_recommendations', [])
             }
-            
-            # Procesar análisis de vulnerabilidades
-            # Intentar ambos nombres de campo para compatibilidad
-            vulnerability_analysis = triage_json.get('validated_vulnerabilities', triage_json.get('vulnerability_analysis', []))
-            confirmed_count = 0
-            likely_count = 0
-            possible_count = 0
-            false_positive_count = 0
-            
-            for vuln in vulnerability_analysis:
-                # Buscar el estado de validación en diferentes campos posibles
-                validation_status = vuln.get('final_status', vuln.get('validation_status', '')).upper()
-                if validation_status in ['CONFIRMED', 'CONFIRMADA']:
-                    confirmed_count += 1
-                elif validation_status in ['LIKELY', 'PROBABLE']:
-                    likely_count += 1
-                elif validation_status in ['POSSIBLE', 'POSIBLE']:
-                    possible_count += 1
-                elif validation_status in ['FALSE_POSITIVE', 'FALSO_POSITIVO']:
-                    false_positive_count += 1
-            
-            # Actualizar métricas de validación
-            total_reported = extraction_data.get('vulnerabilities_reported', 0)
-            processed_data['vulnerabilities_confirmed'] = confirmed_count
-            processed_data['vulnerabilities_analysis'] = vulnerability_analysis
-            processed_data['validation_summary'].update({
-                "confirmed": confirmed_count,
-                "likely": likely_count,
-                "possible": possible_count,
-                "false_positives": false_positive_count,
-                "validation_rate": (confirmed_count / total_reported * 100) if total_reported > 0 else 0.0
-            })
-            
-            # Sincronizar executive_summary con los valores calculados
-            if 'executive_summary' in processed_data and isinstance(processed_data['executive_summary'], dict):
-                processed_data['executive_summary'].update({
-                    "total_confirmed": confirmed_count,
-                    "total_probable": likely_count,
-                    "total_possible": possible_count,
-                    "total_false_positives": false_positive_count,
-                    "total_not_testeable": 0  # Se puede calcular si es necesario
-                })
             
             return processed_data
             
@@ -709,24 +749,23 @@ class VulnerabilityValidationCrew:
             extraction_result = extraction_crew.kickoff()
             self.logger.info("Extracción completada")
             
-            # Tarea 2: Análisis dinámico (sin resultados de análisis estático)
-            self.logger.info("Ejecutando análisis dinámico...")
-            dynamic_task = DynamicAnalysisTask.create_task(
-                self.dynamic_agent.agent,
-                str(extraction_result),
-                "",  # Sin resultados de análisis estático
+            # Tarea 2: Análisis dinámico usando bucle ReAct directamente
+            self.logger.info("Ejecutando análisis dinámico con bucle ReAct...")
+            
+            # Procesar resultado de extracción para el agente dinámico
+            processed_extraction = self._process_extraction_result(str(extraction_result), pdf_path)
+            
+            # Ejecutar análisis dinámico con bucle ReAct
+            dynamic_result = self.dynamic_agent.analyze_vulnerabilities(
+                processed_extraction,
+                {"findings": []},  # Sin análisis estático
                 target_url
             )
             
-            dynamic_crew = Crew(
-                agents=[self.dynamic_agent.agent],
-                tasks=[dynamic_task],
-                process=Process.sequential,
-                verbose=True
-            )
-            
-            dynamic_result = dynamic_crew.kickoff()
             self.logger.info("Análisis dinámico completado")
+            
+            # Convertir resultado a string para compatibilidad con triage
+            dynamic_result = json.dumps(dynamic_result, indent=2, ensure_ascii=False)
             
             # Tarea 3: Triage y consolidación
             self.logger.info("Ejecutando triage y consolidación...")
@@ -1144,7 +1183,7 @@ def main():
                 print(f"⏱️  Tiempo de ejecución: {duration}")
                 print("\n📊 Componentes generados:")
                 print("  - Extracción de vulnerabilidades")
-                print("  - Análisis dinámico (Nuclei)")
+                print("  - Análisis dinámico")
                 print("  - Triage y consolidación")
                 print("=" * 50)
             else:
@@ -1176,7 +1215,7 @@ def main():
                 print("\n📊 Componentes generados:")
                 print("  - Extracción de vulnerabilidades")
                 print("  - Análisis estático (Semgrep)")
-                print("  - Análisis dinámico (Nuclei)")
+                print("  - Análisis dinámico")
                 print("  - Reporte final de triage")
                 print("=" * 50)
             else:

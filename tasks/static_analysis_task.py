@@ -61,46 +61,23 @@ class StaticAnalysisTask:
         expected_output = """
         Un JSON válido con la siguiente estructura:
         {
-            "analysis_metadata": {
-                "analysis_date": "string",
-                "source_path": "string",
-                "total_vulnerabilities_analyzed": "number",
-                "semgrep_version": "string",
-                "rules_used": ["string"]
-            },
-            "validation_results": [
-                {
-                    "vulnerability_id": "string (del reporte original)",
-                    "vulnerability_title": "string",
-                    "validation_status": "CONFIRMADA|NO_CONFIRMADA|PROBABLE|PARCIAL|NO_APLICABLE",
-                    "confidence_level": "High|Medium|Low",
-                    "semgrep_findings": [
+            "static_analysis_results": {
+                "vulnerability_id": "string",
+                "vulnerability_title": "string",
+                "vulnerability_type": "string",
+                "validation_status": "CONFIRMED|NOT_FOUND|PARTIAL|INCONCLUSIVE",
+                "confidence_level": "High|Medium|Low",
+                "evidence": {
+                    "code_snippets": [
                         {
-                            "rule_id": "string",
                             "file_path": "string",
-                            "line_number": "number",
-                            "code_snippet": "string",
-                            "severity": "string",
-                            "message": "string"
+                            "line_numbers": "string",
+                            "vulnerable_code": "string",
+                            "vulnerability_pattern": "string"
                         }
                     ],
-                    "analysis_details": {
-                        "rules_applied": ["string"],
-                        "files_scanned": "number",
-                        "match_reasoning": "string",
-                        "false_positive_likelihood": "High|Medium|Low"
-                    },
-                    "evidence": "string con evidencia detallada de los hallazgos encontrados",
-                    "recommendations": "string"
+                    "analysis_summary": "string - Resumen del análisis realizado"
                 }
-            ],
-            "summary": {
-                "confirmed_vulnerabilities": "number",
-                "unconfirmed_vulnerabilities": "number",
-                "partial_matches": "number",
-                "not_applicable": "number",
-                "overall_confidence": "High|Medium|Low",
-                "additional_findings": "string"
             }
         }
         """

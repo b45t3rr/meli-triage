@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Tarea de análisis dinámico con Nuclei
+Tarea de análisis dinámico con herramientas personalizadas
 Ejecutada por el agente dinámico
 """
 
@@ -31,8 +31,8 @@ class DynamicAnalysisTask:
            - Identificar CWEs, endpoints, parámetros y payloads específicos
            - Correlacionar con resultados del análisis estático si están disponibles
         
-        2. CREAR TEMPLATES PERSONALIZADOS DE NUCLEI:
-           - NO uses templates genéricos o predefinidos de Nuclei
+        2. CREAR PRUEBAS PERSONALIZADAS:
+- NO uses templates genéricos o predefinidos
            - Para CADA vulnerabilidad específica, crea un template YAML personalizado que:
              * Use los endpoints exactos mencionados en el reporte
              * Incluya los parámetros vulnerables identificados
@@ -40,7 +40,16 @@ class DynamicAnalysisTask:
              * Tenga matchers apropiados para detectar la explotación exitosa
         
         3. EJECUTAR ANÁLISIS DINÁMICO DIRIGIDO:
-           - Usar ÚNICAMENTE los templates personalizados creados
+           - OPCIÓN A: Usar pruebas personalizadas con curl y nmap para vulnerabilidades simples
+           - OPCIÓN B: Usar herramienta curl para análisis inteligente de vulnerabilidades complejas
+           - Para vulnerabilidades que requieren autenticación, múltiples pasos o contexto específico:
+             * Usar analyze_vulnerability_with_curl(vulnerability, extractor_context, static_context) para análisis detallado
+             * Pasar el contexto del agente extractor (tecnologías, frameworks, formularios, parámetros)
+             * Pasar el contexto del análisis estático (patrones vulnerables, funciones peligrosas, validaciones)
+             * Los payloads serán generados dinámicamente por el LLM basándose en este contexto
+             * Realizar reconocimiento inicial del servidor
+             * Probar múltiples payloads específicos del tipo de vulnerabilidad
+             * Analizar respuestas del servidor para detectar indicadores de explotación
            - Testear cada endpoint vulnerable con payloads específicos
            - Aplicar técnicas de bypass si es necesario
            - Documentar cada intento de explotación con evidencia HTTP completa
@@ -68,11 +77,11 @@ class DynamicAnalysisTask:
            - Cuerpo completo de la respuesta
            - Tiempo de respuesta
            - Indicadores específicos que demuestran la vulnerabilidad
-           - Template de Nuclei utilizado
+           - Herramienta utilizada (curl/nmap)
            - Técnica de explotación empleada
         
         Usa tu experiencia en penetration testing para:
-        - Crear templates de Nuclei efectivos
+        - Crear pruebas dinámicas efectivas
         - Interpretar respuestas de la aplicación
         - Identificar indicadores de vulnerabilidades
         - Evitar falsos positivos
@@ -86,81 +95,16 @@ class DynamicAnalysisTask:
         expected_output = """
         Un JSON válido con la siguiente estructura:
         {
-            "analysis_metadata": {
-                "analysis_date": "string",
-                "target_url": "string",
-                "total_vulnerabilities_tested": "number",
-                "nuclei_version": "string",
-                "templates_used": ["string"],
-                "custom_templates_created": "number"
-            },
-            "exploitation_results": [
-                {
-                    "vulnerability_id": "string (del reporte original)",
-                    "vulnerability_title": "string",
-                    "exploitation_status": "EXPLOTABLE|NO_EXPLOTABLE|PARCIAL|NO_TESTEABLE",
-                    "confidence_level": "High|Medium|Low",
-                    "nuclei_findings": [
-                        {
-                            "template_id": "string",
-                            "matched_url": "string",
-                            "severity": "string",
-                            "description": "string",
-                            "extracted_data": ["string"],
-                            "response_time": "string",
-                            "status_code": "number"
-                        }
-                    ],
-                    "exploitation_details": {
-                        "payload_used": "string",
-                        "request_method": "string",
-                        "vulnerable_parameter": "string",
-                        "response_indicators": ["string"],
-                        "custom_template_used": "boolean"
-                    },
-                    "evidence": {
-                        "http_evidence": [
-                            {
-                                "request_url": "string - URL completa de la solicitud",
-                                "request_method": "string - Método HTTP (GET, POST, etc.)",
-                                "request_headers": "string - Headers de la solicitud HTTP",
-                                "request_body": "string - Cuerpo de la solicitud (payload)",
-                                "response_status": "number - Código de estado HTTP",
-                                "response_headers": "string - Headers de la respuesta",
-                                "response_body": "string - Cuerpo de la respuesta (evidencia)",
-                                "response_time": "string - Tiempo de respuesta",
-                                "vulnerability_indicator": "string - Indicador específico de vulnerabilidad",
-                                "payload_type": "string - Tipo de payload utilizado",
-                                "nuclei_template": "string - Template de Nuclei utilizado",
-                                "exploitation_technique": "string - Técnica de explotación empleada"
-                            }
-                        ],
-                        "proof_of_concept": "string - Descripción detallada del PoC",
-                        "exploitation_steps": ["string - Pasos específicos para reproducir la explotación"]
-                    },
-                    "impact_assessment": {
-                        "exploitability": "High|Medium|Low",
-                        "data_exposure": "string",
-                        "system_impact": "string"
-                    },
-                    "recommendations": "string"
+            "dynamic_analysis_results": {
+                "vulnerability_id": "string",
+                "vulnerability_title": "string",
+                "vulnerability_type": "string",
+                "exploitation_status": "EXPLOITABLE|NOT_EXPLOITABLE|INCONCLUSIVE",
+                "confidence_level": "High|Medium|Low",
+                "evidence": {
+                    "exploitation_proof": "string",
+                    "technical_details": "string"
                 }
-            ],
-            "custom_templates": [
-                {
-                    "template_name": "string",
-                    "vulnerability_type": "string",
-                    "template_content": "string (YAML)",
-                    "creation_reasoning": "string"
-                }
-            ],
-            "summary": {
-                "exploitable_vulnerabilities": "number",
-                "non_exploitable_vulnerabilities": "number",
-                "partial_exploitations": "number",
-                "non_testeable": "number",
-                "overall_risk_level": "Critical|High|Medium|Low",
-                "additional_findings": "string"
             }
         }
         """
@@ -172,41 +116,6 @@ class DynamicAnalysisTask:
         )
     
 
-    
-    @staticmethod
-    def get_nuclei_template_structure() -> Dict[str, Any]:
-        """Estructura base para templates personalizados de Nuclei"""
-        return {
-            "id": "custom-vulnerability-test",
-            "info": {
-                "name": "Custom Vulnerability Test",
-                "author": "VulnValidation System",
-                "severity": "high",
-                "description": "Custom template for specific vulnerability validation",
-                "tags": ["custom", "validation"]
-            },
-            "requests": [
-                {
-                    "method": "GET",
-                    "path": ["/{{BaseURL}}"],
-                    "headers": {
-                        "User-Agent": "VulnValidation/1.0"
-                    },
-                    "matchers-condition": "and",
-                    "matchers": [
-                        {
-                            "type": "status",
-                            "status": [200]
-                        },
-                        {
-                            "type": "word",
-                            "words": ["error", "exception"],
-                            "condition": "or"
-                        }
-                    ]
-                }
-            ]
-        }
     
     @staticmethod
     def get_payload_encoding_techniques() -> Dict[str, list]:

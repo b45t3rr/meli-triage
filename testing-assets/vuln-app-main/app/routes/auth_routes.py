@@ -31,14 +31,8 @@ def login():
             # Crear un cursor que devuelva diccionarios
             cursor = conn.cursor(dictionary=True)
             
-            # 1. Consulta vulnerable clásica
-            query = f"SELECT * FROM user WHERE username = '{username}' AND password_hash = '{generate_password_hash(password)}'"
-            
-            # 2. Versión alternativa con comentario al final
-            # query = f"SELECT * FROM user WHERE username = '{username}' -- ' AND password_hash = '...'"
-            
-            # 3. Versión con OR 1=1
-            # query = f"SELECT * FROM user WHERE username = '{username}' OR '1'='1' -- ' AND password_hash = '...'"
+            # Inyección SQL en el campo de contraseña - vulnerable a bypass
+            query = f"SELECT * FROM user WHERE username = '{username}' AND password_hash = '{password}'"
             
             current_app.logger.error(f"[VULN] Query: {query}")
             
@@ -48,7 +42,7 @@ def login():
             conn.close()
             
             if user_data:
-                # Convertir el resultado a un objeto User
+                # Si la consulta SQL retorna datos, el login es exitoso
                 user = User(
                     id=user_data['id'],
                     username=user_data['username'],

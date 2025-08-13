@@ -20,17 +20,25 @@ class ExtractionTask:
         Tu objetivo es:
         1. Extraer todo el texto del PDF usando la herramienta PDF Extractor
         2. Identificar y catalogar todas las vulnerabilidades mencionadas
-        3. Para cada vulnerabilidad encontrada, extraer:
+        3. Para cada vulnerabilidad encontrada, extraer TODA la información técnica disponible:
            - Título/nombre de la vulnerabilidad
-           - Descripción detallada
+           - Descripción técnica detallada
            - Severidad (Critical, High, Medium, Low, Info)
            - CWE ID si está disponible, o asignar uno apropiado
            - Categoría OWASP si aplica
-           - URL/endpoint afectado
-           - Parámetros vulnerables
-           - Método HTTP utilizado
-           - Evidencia/payload utilizado
-           - Recomendaciones de remediación
+           - URL/endpoint completo afectado
+           - Parámetros específicos vulnerables
+           - Método HTTP utilizado (GET, POST, PUT, etc.)
+           - MÚLTIPLES solicitudes HTTP COMPLETAS (SOLO si están disponibles en el reporte)
+           - MÚLTIPLES respuestas HTTP COMPLETAS (SOLO si están disponibles en el reporte)
+           - MÚLTIPLES payloads específicos utilizados (SOLO si están disponibles)
+           - MÚLTIPLES fragmentos de código vulnerable con contexto (SOLO si están disponibles)
+           - Componentes y versiones afectadas
+           - MÚLTIPLES evidencias adicionales de diferentes tipos (SOLO si están disponibles)
+           - Detalle de explotación paso a paso con información técnica completa
+           - Impacto técnico y de negocio
+           - Recomendaciones específicas de remediación con ejemplos
+           - Referencias externas y CVEs relacionados
         
         4. Estandarizar la información en un formato JSON estructurado
         5. Asignar CWEs apropiados basándote en tu conocimiento de seguridad
@@ -40,12 +48,19 @@ class ExtractionTask:
         - Identificar patrones de vulnerabilidades comunes
         - Asignar CWEs precisos basándote en la descripción
         - Normalizar nombres de vulnerabilidades
-        - Extraer información técnica relevante
+        - Extraer TODA la información técnica disponible en el reporte
+        - Capturar solicitudes y respuestas HTTP completas
+        - Identificar payloads específicos y técnicas de explotación
+        - Extraer fragmentos de código vulnerable
+        - Documentar componentes y versiones afectadas
+        - Preservar evidencias visuales y logs de herramientas
         
         IMPORTANTE: 
         - Retorna ÚNICAMENTE un JSON válido con la estructura especificada.
         - No incluyas texto adicional, explicaciones o comentarios fuera del JSON.
         - RESPONDE SIEMPRE EN ESPAÑOL. Todos los campos de texto, descripciones, mensajes y contenido deben estar en español.
+        - NO INVENTES información que no esté en el reporte. Los campos http_requests, http_responses, payloads, vulnerable_code_snippets y evidences son OPCIONALES.
+        - SOLO incluye estos campos opcionales si la información está realmente presente y documentada en el reporte PDF.
         """
         
         expected_output = """
@@ -64,15 +79,18 @@ class ExtractionTask:
                     "description": "string",
                     "severity": "Critical|High|Medium|Low|Info",
                     "cwe_id": "string (ej: CWE-89)",
-                    "owasp_category": "string",
+                    "type": "string (IDOR|XSS|SQLi|LFI|SSRF|etc)",
                     "affected_url": "string",
-                    "affected_parameter": "string",
                     "http_method": "string",
-                    "evidence": "string",
-                    "payload": "string",
-                    "impact": "string",
-                    "remediation": "string",
-                    "references": ["string"]
+                    "detailed_poc": "string - Explicación detallada paso a paso de cómo explotar la vulnerabilidad. Incluye solicitudes y respuestas HTTP completas, payloads específicos, y secuencia de explotación.",
+                    "http_requests": ["Lista de solicitudes HTTP completas con headers, método, URL y body"],
+                     "http_responses": ["Lista de respuestas HTTP completas con status code, headers y body"],
+                     "payloads": ["Lista de payloads específicos utilizados"],
+                     "vulnerable_code_snippets": ["Lista de fragmentos de código vulnerable con contexto"],
+                     "evidences": ["Lista de evidencias: screenshots, logs, outputs, code snippets, configuraciones"],
+                    "impact": "string - Impacto técnico y de negocio",
+                    "remediation": "string - Recomendaciones específicas con ejemplos",
+                    "references": "array - Referencias externas y CVEs relacionados"
                 }
             ]
         }
@@ -113,12 +131,31 @@ class ExtractionTask:
                                 "enum": ["Critical", "High", "Medium", "Low", "Info"]
                             },
                             "cwe_id": {"type": "string"},
-                            "owasp_category": {"type": "string"},
+                            "type": {"type": "string"},
                             "affected_url": {"type": "string"},
                             "affected_parameter": {"type": "string"},
                             "http_method": {"type": "string"},
-                            "evidence": {"type": "string"},
-                            "payload": {"type": "string"},
+                            "detailed_poc": {"type": "string"},
+                             "http_requests": {
+                                 "type": "array",
+                                 "items": {"type": "string"}
+                             },
+                             "http_responses": {
+                                 "type": "array",
+                                 "items": {"type": "string"}
+                             },
+                             "payloads": {
+                                 "type": "array",
+                                 "items": {"type": "string"}
+                             },
+                             "vulnerable_code_snippets": {
+                                 "type": "array",
+                                 "items": {"type": "string"}
+                             },
+                             "evidences": {
+                                 "type": "array",
+                                 "items": {"type": "string"}
+                             },
                             "impact": {"type": "string"},
                             "remediation": {"type": "string"},
                             "references": {
@@ -128,7 +165,7 @@ class ExtractionTask:
                         },
                         "required": [
                             "id", "title", "description", "severity", 
-                            "cwe_id", "affected_url", "remediation"
+                            "cwe_id", "type", "affected_url", "remediation"
                         ]
                     }
                 }

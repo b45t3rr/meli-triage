@@ -46,86 +46,68 @@ class TriageAgent:
         )
     
     def get_validation_status_criteria(self) -> Dict[str, Dict[str, Any]]:
-        """Criterios para determinar el estado de validación de vulnerabilidades"""
+        """Criterios simplificados para determinar el estado de validación de vulnerabilidades"""
         return {
-            "CONFIRMED": {
-                "description": "Vulnerabilidad confirmada por análisis estático Y dinámico",
-                "criteria": {
-                    "static_analysis": "CONFIRMED",
-                    "dynamic_analysis": "EXPLOITABLE",
-                    "confidence_threshold": 0.8
-                },
-                "priority": "IMMEDIATE"
+            "CONFIRMADA": {
+                "description": "Vulnerabilidad confirmada por al menos uno de los agentes",
+                "priority": "ALTA",
+                "action": "Corregir inmediatamente"
             },
-            "LIKELY": {
-                "description": "Vulnerabilidad confirmada por uno de los análisis con alta confianza",
-                "criteria": {
-                    "static_analysis": ["CONFIRMED", "PARTIAL"],
-                    "dynamic_analysis": ["EXPLOITABLE", "PARTIALLY_EXPLOITABLE"],
-                    "confidence_threshold": 0.7
-                },
-                "priority": "HIGH"
-            },
-            "POSSIBLE": {
+            "POSIBLE": {
                 "description": "Evidencia parcial o indicios de vulnerabilidad",
-                "criteria": {
-                    "static_analysis": ["PARTIAL", "UNCERTAIN"],
-                    "dynamic_analysis": ["PARTIALLY_EXPLOITABLE", "BLOCKED"],
-                    "confidence_threshold": 0.5
-                },
-                "priority": "MEDIUM"
+                "priority": "MEDIA",
+                "action": "Investigar más a fondo"
             },
-            "UNLIKELY": {
-                "description": "Poca evidencia o hallazgos contradictorios",
-                "criteria": {
-                    "static_analysis": ["NOT_FOUND", "UNCERTAIN"],
-                    "dynamic_analysis": ["NOT_EXPLOITABLE", "BLOCKED"],
-                    "confidence_threshold": 0.3
-                },
-                "priority": "LOW"
-            },
-            "FALSE_POSITIVE": {
-                "description": "Vulnerabilidad reportada pero no confirmada por ningún análisis",
-                "criteria": {
-                    "static_analysis": "NOT_FOUND",
-                    "dynamic_analysis": "NOT_EXPLOITABLE",
-                    "confidence_threshold": 0.1
-                },
-                "priority": "INFORMATIONAL"
+            "INEXISTENTE": {
+                "description": "No se encontró evidencia de la vulnerabilidad",
+                "priority": "NINGUNA",
+                "action": "Ignorar"
             }
         }
     
     def get_severity_reclassification_matrix(self) -> Dict[str, Dict[str, str]]:
-        """Matriz para reclasificar severidad basada en evidencia"""
+        """Matriz simplificada para reclasificar severidad basada en validación"""
         return {
-            "Critical": {
-                "CONFIRMED": "Critical",
-                "LIKELY": "High",
-                "POSSIBLE": "Medium",
-                "UNLIKELY": "Low",
-                "FALSE_POSITIVE": "Informational"
+            "Crítica": {
+                "CONFIRMADA": "Crítica",
+                "POSIBLE": "Alta",
+                "INEXISTENTE": "Ninguna"
             },
-            "High": {
-                "CONFIRMED": "High",
-                "LIKELY": "High",
-                "POSSIBLE": "Medium",
-                "UNLIKELY": "Low",
-                "FALSE_POSITIVE": "Informational"
+            "Alta": {
+                "CONFIRMADA": "Alta",
+                "POSIBLE": "Media",
+                "INEXISTENTE": "Ninguna"
             },
-            "Medium": {
-                "CONFIRMED": "Medium",
-                "LIKELY": "Medium",
-                "POSSIBLE": "Medium",
-                "UNLIKELY": "Low",
-                "FALSE_POSITIVE": "Informational"
+            "Media": {
+                "CONFIRMADA": "Media",
+                "POSIBLE": "Baja",
+                "INEXISTENTE": "Ninguna"
             },
-            "Low": {
-                "CONFIRMED": "Medium",
-                "LIKELY": "Low",
-                "POSSIBLE": "Low",
-                "UNLIKELY": "Low",
-                "FALSE_POSITIVE": "Informational"
+            "Baja": {
+                "CONFIRMADA": "Media",
+                "POSIBLE": "Baja",
+                "INEXISTENTE": "Ninguna"
             }
+        }
+    
+    def get_validation_logic(self) -> Dict[str, str]:
+        """Lógica simplificada para determinar el estado de validación"""
+        return {
+            "CONFIRMADA": "Cualquier agente (estático O dinámico) confirma la vulnerabilidad",
+            "POSIBLE": "Solo evidencia parcial o indicios en algún análisis",
+            "INEXISTENTE": "Ningún agente encuentra evidencia de la vulnerabilidad"
+        }
+    
+    def get_simple_interpretation_guide(self) -> Dict[str, str]:
+        """Guía simple para interpretar los resultados del triage"""
+        return {
+            "¿Qué significa cada estado?": {
+                "CONFIRMADA": "🔴 URGENTE: Vulnerabilidad confirmada por al menos un agente - corregir YA",
+                "POSIBLE": "🟡 REVISAR: Evidencia parcial - investigar más a fondo",
+                "INEXISTENTE": "⚪ IGNORAR: No se encontró evidencia de vulnerabilidad"
+            },
+            "¿Cómo priorizar?": "1. CONFIRMADA (inmediato) → 2. POSIBLE (investigar pronto) → 3. INEXISTENTE (ignorar)",
+            "¿Qué hacer con cada una?": "CONFIRMADA: Corregir ahora | POSIBLE: Investigar más | INEXISTENTE: Ignorar"
         }
     
     def get_remediation_templates(self) -> Dict[str, Dict[str, Any]]:
@@ -271,8 +253,8 @@ class TriageAgent:
                     "owasp_category": "string",
                     "evidence_summary": {
                         "static_analysis": {
-                            "status": "CONFIRMADA|NO_CONFIRMADA|PARCIAL",
-                            "confidence": "High|Medium|Low",
+                            "status": "ENCONTRADA|NO_ENCONTRADA|PARCIAL",
+                            "confidence": "Alta|Media|Baja",
                             "findings_count": "int",
                             "findings_summary": "string - Resumen detallado de los hallazgos",
                             "code_evidence": [
@@ -295,7 +277,7 @@ class TriageAgent:
                         },
                         "dynamic_analysis": {
                             "status": "EXPLOTABLE|NO_EXPLOTABLE|PARCIAL|NO_TESTEABLE",
-                            "confidence": "High|Medium|Low",
+                            "confidence": "Alta|Media|Baja",
                             "exploitation_summary": "string - Resumen detallado de la explotación",
                             "http_evidence": [
                                 {
@@ -309,14 +291,14 @@ class TriageAgent:
                                     "response_time": "string - Tiempo de respuesta",
                                     "vulnerability_indicator": "string - Indicador específico de vulnerabilidad",
                                     "payload_type": "string - Tipo de payload utilizado",
-                                    "nuclei_template": "string - Template de Nuclei utilizado",
+                                    "tool_used": "string - Herramienta utilizada (curl/nmap)",
                                     "exploitation_technique": "string - Técnica de explotación empleada"
                                 }
                             ],
                             "technical_details": {
                                 "total_requests": "int - Total de solicitudes realizadas",
                                 "successful_exploits": "int - Explotaciones exitosas",
-                                "templates_used": ["string - Templates de Nuclei utilizados"],
+                                "tools_used": ["string - Herramientas utilizadas (curl/nmap)"],
                                 "custom_templates_created": "int - Templates personalizados creados",
                                 "target_endpoints": ["string - Endpoints objetivo testeados"]
                             }
@@ -403,7 +385,7 @@ class TriageAgent:
             
             METODOLOGÍA:
             • Análisis estático con Semgrep
-            • Análisis dinámico con Nuclei
+            • Análisis dinámico con herramientas personalizadas
             • Correlación automatizada con IA
             
             HALLAZGOS TÉCNICOS:

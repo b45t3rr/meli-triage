@@ -22,14 +22,12 @@ def index():
     return render_template('index.html', documents=documents)
 
 @main.route('/document/<int:doc_id>')
-@login_required
 def view_document(doc_id):
     # IDOR vulnerability - no check if user has access to this document
     document = Document.query.get_or_404(doc_id)
     return render_template('document.html', document=document)
 
 @main.route('/profile/<int:user_id>')
-@login_required
 def view_profile(user_id):
     # IDOR Vulnerability: No se verifica si el usuario actual tiene permiso para ver este perfil
     user = User.query.get_or_404(user_id)

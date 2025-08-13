@@ -144,26 +144,26 @@ class MongoDBClient:
         # Solo necesitamos agregarlo como result_data
         return self.save_scan_result("extraction", processed_data, metadata)
     
-    def save_static_analysis_result(self, source_code_path: str, findings: List[Dict[str, Any]], 
+    def save_static_analysis_result(self, source_code_path: str, static_analysis_results: List[Dict[str, Any]], 
                                    metadata: Optional[Dict[str, Any]] = None) -> Optional[str]:
-        """Guarda resultado de análisis estático"""
+        """Guarda resultado de análisis estático simplificado"""
         
         result_data = {
             "source_code_path": source_code_path,
-            "findings_count": len(findings),
-            "findings": findings
+            "results_count": len(static_analysis_results),
+            "static_analysis_results": static_analysis_results  # Solo contiene: vulnerability_id, vulnerability_title, vulnerability_type, validation_status, confidence_level, evidence
         }
         
         return self.save_scan_result("static_analysis", result_data, metadata)
     
-    def save_dynamic_analysis_result(self, target_url: str, vulnerabilities: List[Dict[str, Any]], 
+    def save_dynamic_analysis_result(self, target_url: str, dynamic_analysis_results: List[Dict[str, Any]], 
                                     metadata: Optional[Dict[str, Any]] = None) -> Optional[str]:
-        """Guarda resultado de análisis dinámico"""
+        """Guarda resultado de análisis dinámico simplificado"""
         
         result_data = {
             "target_url": target_url,
-            "vulnerabilities_found": len(vulnerabilities),
-            "vulnerabilities": vulnerabilities
+            "results_count": len(dynamic_analysis_results),
+            "dynamic_analysis_results": dynamic_analysis_results  # Solo contiene: vulnerability_id, vulnerability_title, vulnerability_type, exploitation_status, confidence_level, evidence, react_log
         }
         
         return self.save_scan_result("dynamic_analysis", result_data, metadata)
@@ -175,7 +175,7 @@ class MongoDBClient:
         return self.save_scan_result("triage", consolidated_results, metadata)
     
     def get_vulnerability_summary(self, limit: int = 10) -> Dict[str, Any]:
-        """Obtiene un resumen consolidado de vulnerabilidades reportadas y corroboradas"""
+        """Obtiene un resumen consolidado de vulnerabilidades con esquemas simplificados"""
         
         if self.database is None:
             self.logger.error("No hay conexión activa a la base de datos")
@@ -206,65 +206,48 @@ class MongoDBClient:
                 "consolidated_metrics": {
                     "total_vulnerabilities_reported": 0,
                     "total_vulnerabilities_confirmed": 0,
-                    "validation_rate": 0.0,
-                    "severity_distribution": {
-                        "critical": 0,
-                        "high": 0,
-                        "medium": 0,
-                        "low": 0
-                    }
+                    "total_false_positives": 0,
+                    "validation_rate": 0.0
                 }
             }
             
-            # Procesar resultados de extracción
+            # Procesar resultados de extracción simplificados
             total_reported = 0
             for result in extraction_results:
                 result_data = result.get("result_data", {})
                 vulnerabilities_count = result_data.get("vulnerabilities_reported", 0)
                 total_reported += vulnerabilities_count
                 
-                extraction_summary = result_data.get("extraction_summary", {})
-                
                 summary["extraction_summary"]["reports"].append({
                     "timestamp": result.get("timestamp"),
                     "pdf_path": result_data.get("pdf_path"),
                     "vulnerabilities_reported": vulnerabilities_count,
-                    "severity_breakdown": {
-                        "critical": extraction_summary.get("critical_count", 0),
-                        "high": extraction_summary.get("high_count", 0),
-                        "medium": extraction_summary.get("medium_count", 0),
-                        "low": extraction_summary.get("low_count", 0)
-                    },
-                    "categories": extraction_summary.get("categories", []),
-                    "cwe_types": extraction_summary.get("cwe_types", [])
+                    "document_metadata": result_data.get("document_metadata", {})
                 })
             
-            # Procesar resultados de triage
+            # Procesar resultados de triage simplificados
             total_confirmed = 0
+            total_false_positives = 0
             for result in triage_results:
                 result_data = result.get("result_data", {})
-                confirmed_count = result_data.get("vulnerabilities_confirmed", 0)
+                confirmed_count = result_data.get("confirmed_vulnerabilities", 0)
+                false_positives_count = result_data.get("false_positives", 0)
                 total_confirmed += confirmed_count
-                
-                validation_summary = result_data.get("validation_summary", {})
+                total_false_positives += false_positives_count
                 
                 summary["triage_summary"]["analyses"].append({
                     "timestamp": result.get("timestamp"),
                     "analysis_metadata": result_data.get("analysis_metadata", {}),
-                    "vulnerabilities_reported": result_data.get("vulnerabilities_reported", 0),
-                    "vulnerabilities_confirmed": confirmed_count,
-                    "validation_breakdown": {
-                        "confirmed": validation_summary.get("confirmed", 0),
-                        "likely": validation_summary.get("likely", 0),
-                        "possible": validation_summary.get("possible", 0),
-                        "false_positives": validation_summary.get("false_positives", 0)
-                    },
-                    "validation_rate": validation_summary.get("validation_rate", 0.0)
+                    "total_vulnerabilities": result_data.get("total_vulnerabilities", 0),
+                    "confirmed_vulnerabilities": confirmed_count,
+                    "false_positives": false_positives_count,
+                    "risk_level": result_data.get("risk_level", "Unknown")
                 })
             
             # Calcular métricas consolidadas
             summary["consolidated_metrics"]["total_vulnerabilities_reported"] = total_reported
             summary["consolidated_metrics"]["total_vulnerabilities_confirmed"] = total_confirmed
+            summary["consolidated_metrics"]["total_false_positives"] = total_false_positives
             summary["consolidated_metrics"]["validation_rate"] = (
                 (total_confirmed / total_reported * 100) if total_reported > 0 else 0.0
             )
@@ -313,15 +296,14 @@ class MongoDBClient:
                     "timestamp": result.get("timestamp"),
                     "metadata": result_data.get("analysis_metadata", {})
                 },
-                "vulnerability_correlation": {
-                    "total_reported": result_data.get("vulnerabilities_reported", 0),
-                    "total_confirmed": result_data.get("vulnerabilities_confirmed", 0),
-                    "validation_summary": result_data.get("validation_summary", {})
+                "vulnerability_summary": {
+                    "total_vulnerabilities": result_data.get("total_vulnerabilities", 0),
+                    "confirmed_vulnerabilities": result_data.get("confirmed_vulnerabilities", 0),
+                    "false_positives": result_data.get("false_positives", 0),
+                    "risk_level": result_data.get("risk_level", "Unknown")
                 },
-                "vulnerabilities_detailed": result_data.get("vulnerabilities_analysis", []),
-                "executive_summary": result_data.get("executive_summary", {}),
-                "recommendations": result_data.get("recommendations", {}),
-                "metrics": result_data.get("metrics", {})
+                "vulnerability_assessments": result_data.get("vulnerability_assessments", []),
+                "remediation_recommendations": result_data.get("remediation_recommendations", [])
             }
             
             return detailed_analysis

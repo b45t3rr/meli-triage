@@ -129,31 +129,28 @@ class StaticAgent:
             4. Funciones o métodos específicos
             5. Parámetros o variables mencionadas
             
-            IMPORTANTE: Para vulnerabilidades con status PROBABLE, PARCIAL o CONFIRMADA, SIEMPRE incluye evidencia detallada en matching_findings.
+            IMPORTANTE: Para vulnerabilidades con status PROBABLE o CONFIRMADA, SIEMPRE incluye evidencia detallada en matching_findings.
             
             Retorna un JSON con la siguiente estructura:
             {{
-                "correlations": [
-                    {{
-                        "vulnerability_id": "string",
-                        "vulnerability_title": "string",
-                        "status": "CONFIRMADA|NO_CONFIRMADA|PARCIAL|PROBABLE",
-                        "confidence": "High|Medium|Low",
-                        "matching_findings": [
+                "static_analysis_results": {{
+                    "vulnerability_id": "string",
+                    "vulnerability_title": "string",
+                    "vulnerability_type": "string",
+                    "validation_status": "CONFIRMED|NOT_FOUND|PARTIAL|INCONCLUSIVE",
+                    "confidence_level": "High|Medium|Low",
+                    "evidence": {{
+                        "code_snippets": [
                             {{
-                                "rule_id": "string",
                                 "file_path": "string",
-                                "line_number": "number",
-                                "code_snippet": "string",
-                                "message": "string",
-                                "severity": "string",
-                                "match_reason": "string"
+                                "line_numbers": "string",
+                                "vulnerable_code": "string",
+                                "vulnerability_pattern": "string"
                             }}
                         ],
-                        "evidence": "string con evidencia detallada encontrada",
-                        "reasoning": "string explicando por qué se considera confirmada/no confirmada/probable"
+                        "analysis_summary": "string - Resumen del análisis realizado"
                     }}
-                ]
+                }}
             }}
             """
             
@@ -181,15 +178,35 @@ class StaticAgent:
                         # Intentar parsear toda la respuesta
                         result = json.loads(response_text)
                     
-                    # Asegurar que todas las correlaciones con hallazgos tengan evidencia
-                    if 'correlations' in result:
-                        for correlation in result['correlations']:
-                            if correlation.get('matching_findings') and not correlation.get('evidence'):
-                                # Generar evidencia automáticamente si no está presente
-                                evidence_parts = []
-                                for finding in correlation['matching_findings']:
-                                    evidence_parts.append(f"Archivo: {finding.get('file_path', 'N/A')} (línea {finding.get('line_number', 'N/A')}) - {finding.get('message', 'N/A')}")
-                                correlation['evidence'] = "\n".join(evidence_parts)
+                    # Convertir formato de correlaciones al formato simplificado
+                    if 'correlations' in result and result['correlations']:
+                        # Tomar la primera correlación como resultado principal
+                        first_correlation = result['correlations'][0]
+                        
+                        # Convertir matching_findings a code_snippets
+                        code_snippets = []
+                        for finding in first_correlation.get('matching_findings', []):
+                            code_snippets.append({
+                                "file_path": finding.get('file_path', ''),
+                                "line_numbers": str(finding.get('line_number', '')),
+                                "vulnerable_code": finding.get('code_snippet', ''),
+                                "vulnerability_pattern": finding.get('message', '')
+                            })
+                        
+                        simplified_result = {
+                            "static_analysis_results": {
+                                "vulnerability_id": first_correlation.get('vulnerability_id', ''),
+                                "vulnerability_title": first_correlation.get('vulnerability_title', ''),
+                                "vulnerability_type": "unknown",
+                                "validation_status": first_correlation.get('status', 'INCONCLUSIVE').replace('CONFIRMADA', 'CONFIRMED').replace('NO_CONFIRMADA', 'NOT_FOUND').replace('PROBABLE', 'PARTIAL'),
+                                "confidence_level": first_correlation.get('confidence', 'Low'),
+                                "evidence": {
+                                    "code_snippets": code_snippets,
+                                    "analysis_summary": first_correlation.get('reasoning', 'Análisis completado')
+                                }
+                            }
+                        }
+                        return simplified_result
                     
                     return result
                 except (json.JSONDecodeError, ValueError) as e:
@@ -440,115 +457,76 @@ class StaticAgent:
 
     
     def _fallback_correlation(self, semgrep_results: Dict[str, Any], reported_vulnerabilities: List[Dict[str, Any]]) -> Dict[str, Any]:
-        """Método de fallback mejorado para correlación cuando el LLM no está disponible"""
+        """Método de fallback simplificado para correlación cuando el LLM no está disponible"""
         try:
-            correlations = []
             semgrep_findings = semgrep_results.get('results', [])
             
-            # Mapeo de palabras clave para diferentes tipos de vulnerabilidades
-            vulnerability_keywords = {
-                'path_traversal': ['path', 'traversal', 'directory', 'file', 'filename', '../', '..\\'],
-                'sql_injection': ['sql', 'injection', 'query', 'execute', 'cursor', 'database'],
-                'xss': ['xss', 'script', 'html', 'render', 'template', 'markup', 'escape'],
-                'ssrf': ['ssrf', 'request', 'url', 'http', 'fetch', 'curl', 'urllib'],
-                'idor': ['idor', 'authorization', 'access', 'permission', 'user', 'id', 'object'],
-                'csrf': ['csrf', 'token', 'form', 'post', 'session'],
-                'deserialization': ['deserialize', 'pickle', 'serialize', 'marshal', 'unmarshal'],
-                'command_injection': ['command', 'exec', 'system', 'shell', 'subprocess', 'os.system'],
-                'ldap_injection': ['ldap', 'directory', 'bind', 'search', 'filter'],
-                'xxe': ['xml', 'entity', 'external', 'dtd', 'parser']
-            }
+            # Tomar la primera vulnerabilidad reportada
+            if not reported_vulnerabilities:
+                return {
+                    "static_analysis_results": {
+                        "vulnerability_id": "unknown",
+                        "vulnerability_title": "No vulnerabilities reported",
+                        "vulnerability_type": "unknown",
+                        "validation_status": "NOT_FOUND",
+                        "confidence_level": "Low",
+                        "evidence": {
+                            "code_snippets": [],
+                            "analysis_summary": "No se reportaron vulnerabilidades para analizar"
+                        }
+                    }
+                }
             
-            for vuln in reported_vulnerabilities:
-                correlation = {
+            vuln = reported_vulnerabilities[0]
+            
+            # Buscar hallazgos relevantes
+            code_snippets = []
+            for finding in semgrep_findings[:3]:  # Limitar a 3 hallazgos
+                code_snippets.append({
+                    "file_path": finding.get('path', ''),
+                    "line_numbers": str(finding.get('start', {}).get('line', '')),
+                    "vulnerable_code": finding.get('extra', {}).get('lines', ''),
+                    "vulnerability_pattern": finding.get('message', '')
+                })
+            
+            # Determinar status basado en hallazgos
+            if code_snippets:
+                validation_status = "PARTIAL"
+                confidence_level = "Medium"
+                analysis_summary = f"Se encontraron {len(code_snippets)} hallazgos potencialmente relacionados"
+            else:
+                validation_status = "NOT_FOUND"
+                confidence_level = "Low"
+                analysis_summary = "No se encontraron hallazgos específicos en el análisis estático"
+            
+            return {
+                "static_analysis_results": {
                     "vulnerability_id": vuln.get('id', 'unknown'),
                     "vulnerability_title": vuln.get('title', vuln.get('name', 'Unknown')),
-                    "status": "NO_CONFIRMADA",
-                    "confidence": "Low",
-                    "matching_findings": [],
-                    "evidence": "",
-                    "reasoning": "Análisis automático con correlación por palabras clave - se recomienda revisión manual"
+                    "vulnerability_type": vuln.get('type', 'unknown'),
+                    "validation_status": validation_status,
+                    "confidence_level": confidence_level,
+                    "evidence": {
+                        "code_snippets": code_snippets,
+                        "analysis_summary": analysis_summary
+                    }
                 }
-                
-                # Texto completo de la vulnerabilidad para análisis
-                vuln_text = f"{vuln.get('title', '')} {vuln.get('description', '')} {vuln.get('evidence', '')}".lower()
-                
-                # Determinar el tipo de vulnerabilidad más probable
-                detected_vuln_types = []
-                for vuln_type, keywords in vulnerability_keywords.items():
-                    if any(keyword in vuln_text for keyword in keywords):
-                        detected_vuln_types.append(vuln_type)
-                
-                # Buscar coincidencias en los hallazgos de Semgrep
-                for finding in semgrep_findings:
-                    finding_text = f"{finding.get('message', '')} {finding.get('check_id', '')} {finding.get('path', '')}".lower()
-                    
-                    # Calcular score de coincidencia
-                    match_score = 0
-                    match_reasons = []
-                    
-                    # Verificar coincidencias por tipo de vulnerabilidad
-                    for vuln_type in detected_vuln_types:
-                        keywords = vulnerability_keywords[vuln_type]
-                        vuln_matches = sum(1 for keyword in keywords if keyword in vuln_text)
-                        finding_matches = sum(1 for keyword in keywords if keyword in finding_text)
-                        
-                        if vuln_matches > 0 and finding_matches > 0:
-                            match_score += (vuln_matches + finding_matches)
-                            match_reasons.append(f"Coincidencia en {vuln_type}")
-                    
-                    # Verificar coincidencias de archivos específicos
-                    if vuln.get('evidence', ''):
-                        evidence_files = self._extract_file_paths(vuln.get('evidence', ''))
-                        finding_file = finding.get('path', '')
-                        for evidence_file in evidence_files:
-                            if evidence_file in finding_file or finding_file.endswith(evidence_file):
-                                match_score += 5
-                                match_reasons.append(f"Coincidencia de archivo: {evidence_file}")
-                    
-                    # Si hay suficiente score de coincidencia, agregar el hallazgo
-                    if match_score >= 2:
-                        correlation["matching_findings"].append({
-                            "rule_id": finding.get('check_id', ''),
-                            "file_path": finding.get('path', ''),
-                            "line_number": finding.get('start', {}).get('line', 0),
-                            "code_snippet": finding.get('extra', {}).get('lines', ''),
-                            "message": finding.get('message', ''),
-                            "severity": finding.get('extra', {}).get('severity', 'INFO'),
-                            "match_reason": "; ".join(match_reasons),
-                            "match_score": match_score
-                        })
-                        
-                        # Actualizar status y confianza basado en el score
-                        if match_score >= 5:
-                            correlation["status"] = "CONFIRMADA"
-                            correlation["confidence"] = "High"
-                        elif match_score >= 3:
-                            correlation["status"] = "PROBABLE"
-                            correlation["confidence"] = "Medium"
-                        else:
-                            correlation["status"] = "PROBABLE"
-                            correlation["confidence"] = "Low"
-                
-                # Actualizar reasoning y evidencia basado en los resultados
-                if correlation["matching_findings"]:
-                    correlation["reasoning"] = f"Se encontraron {len(correlation['matching_findings'])} hallazgos correlacionados. Tipos detectados: {', '.join(detected_vuln_types)}"
-                    
-                    # Generar evidencia automáticamente
-                    evidence_parts = []
-                    for finding in correlation["matching_findings"]:
-                        evidence_parts.append(f"Archivo: {finding.get('file_path', 'N/A')} (línea {finding.get('line_number', 'N/A')}) - {finding.get('message', 'N/A')}")
-                    correlation["evidence"] = "\n".join(evidence_parts)
-                else:
-                    correlation["reasoning"] = f"No se encontraron hallazgos correlacionados. Tipos detectados: {', '.join(detected_vuln_types) if detected_vuln_types else 'Ninguno'}"
-                    correlation["evidence"] = "No se encontró evidencia específica en el análisis estático"
-                
-                correlations.append(correlation)
-            
-            return {"correlations": correlations}
+            }
             
         except Exception as e:
-            return {"error": f"Error en correlación de fallback: {str(e)}"}
+            return {
+                "static_analysis_results": {
+                    "vulnerability_id": "error",
+                    "vulnerability_title": "Error en análisis",
+                    "vulnerability_type": "unknown",
+                    "validation_status": "INCONCLUSIVE",
+                    "confidence_level": "Low",
+                    "evidence": {
+                        "code_snippets": [],
+                        "analysis_summary": f"Error en correlación de fallback: {str(e)}"
+                    }
+                }
+            }
     
     def _extract_file_paths(self, text: str) -> List[str]:
         """Extrae rutas de archivos del texto de evidencia"""

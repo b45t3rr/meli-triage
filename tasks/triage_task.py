@@ -78,7 +78,7 @@ class TriageTask:
           * Código de estado y headers completos de la respuesta
           * Cuerpo completo de la respuesta que demuestra la vulnerabilidad
           * Tiempo de respuesta y indicadores específicos de explotación
-          * Template de Nuclei utilizado y técnica de explotación empleada
+          * Herramienta utilizada (curl/nmap) y técnica de explotación empleada
           * Descripción detallada de cómo reproducir la explotación
         
         - La evidencia debe ser lo suficientemente detallada para que un desarrollador
@@ -150,14 +150,14 @@ class TriageTask:
                                     "response_time": "string - Tiempo de respuesta",
                                     "vulnerability_indicator": "string - Indicador específico de vulnerabilidad",
                                     "payload_type": "string - Tipo de payload utilizado",
-                                    "nuclei_template": "string - Template de Nuclei utilizado",
+                                    "tool_used": "string - Herramienta utilizada (curl/nmap)",
                                     "exploitation_technique": "string - Técnica de explotación empleada"
                                 }
                             ],
                             "technical_details": {
                                 "total_requests": "number - Total de solicitudes realizadas",
                                 "successful_exploits": "number - Explotaciones exitosas",
-                                "templates_used": ["string - Templates de Nuclei utilizados"],
+                                "tools_used": ["string - Herramientas utilizadas (curl/nmap)"],
                                 "custom_templates_created": "number - Templates personalizados creados",
                                 "target_endpoints": ["string - Endpoints objetivo testeados"]
                             }
@@ -206,14 +206,14 @@ class TriageTask:
                                     "response_time": "string - Tiempo de respuesta",
                                     "vulnerability_indicator": "string - Indicador específico de vulnerabilidad",
                                     "payload_type": "string - Tipo de payload utilizado",
-                                    "nuclei_template": "string - Template de Nuclei utilizado",
+                                    "tool_used": "string - Herramienta utilizada (curl/nmap)",
                                     "exploitation_technique": "string - Técnica de explotación empleada"
                                 }
                             ],
                             "technical_details": {
                                 "total_requests": "number - Total de solicitudes realizadas",
                                 "successful_exploits": "number - Explotaciones exitosas",
-                                "templates_used": ["string - Templates de Nuclei utilizados"],
+                                "tools_used": ["string - Herramientas utilizadas (curl/nmap)"],
                                 "custom_templates_created": "number - Templates personalizados creados",
                                 "target_endpoints": ["string - Endpoints objetivo testeados"]
                             }
@@ -223,105 +223,28 @@ class TriageTask:
             tools_effectiveness_section = '''                    "static_analysis": "number",
                     "dynamic_analysis": "number"'''
         
-        expected_output = f"""
+        expected_output = """
         Un JSON válido con la siguiente estructura:
-        {{
-            "triage_metadata": {{
-                "analysis_date": "string",
-                "analyst": "VulnValidation AI System",
-                "total_vulnerabilities_processed": "number",
-                "validation_methods_used": ["string"],
-                "confidence_threshold": "string"
-            }},
-            "executive_summary": {{
-                "total_confirmed": "number",
-                "total_probable": "number",
-                "total_possible": "number",
-                "total_false_positives": "number",
-                "total_not_testeable": "number",
-                "overall_risk_rating": "Critical|High|Medium|Low",
-                "key_findings": ["string"],
-                "immediate_actions_required": ["string"]
-            }},
-            "validated_vulnerabilities": [
-                {{
-                    "original_id": "string",
+        {
+            "validation_summary": {
+                "total_vulnerabilities": "number",
+                "confirmed_vulnerabilities": "number",
+                "false_positives": "number",
+                "overall_risk_level": "Critical|High|Medium|Low"
+            },
+            "vulnerability_assessments": [
+                {
+                    "vulnerability_id": "string",
                     "title": "string",
-                    "final_status": "CONFIRMADA|PROBABLE|POSIBLE|FALSO_POSITIVO|NO_TESTEABLE",
+                    "type": "string",
                     "original_severity": "string",
-                    "validated_severity": "Critical|High|Medium|Low|Info",
-                    "severity_justification": "string",
-                    "confidence_score": "number (0-100)",
-                    "risk_score": "number (0-10)",
-                    "cwe_id": "string",
-                    "owasp_category": "string",
-{validation_evidence_section}
-                    "exploitability_assessment": {{
-                        "ease_of_exploitation": "High|Medium|Low",
-                        "attack_vector": "string",
-                        "prerequisites": ["string"],
-                        "proof_of_concept": "string"
-                    }},
-                    "impact_assessment": {{
-                        "confidentiality_impact": "High|Medium|Low|None",
-                        "integrity_impact": "High|Medium|Low|None",
-                        "availability_impact": "High|Medium|Low|None",
-                        "business_impact": "string",
-                        "affected_assets": ["string"]
-                    }},
-                    "remediation": {{
-                        "priority": "P0|P1|P2|P3|P4",
-                        "estimated_effort": "string",
-                        "recommended_actions": ["string"],
-                        "compensating_controls": ["string"],
-                        "verification_steps": ["string"]
-                    }},
-                    "references": ["string"]
-                }}
-            ],
-            "risk_analysis": {{
-                "threat_landscape": "string",
-                "attack_scenarios": [
-                    {{
-                        "scenario_name": "string",
-                        "attack_path": "string",
-                        "likelihood": "High|Medium|Low",
-                        "impact": "string",
-                        "mitigation": "string"
-                    }}
-                ],
-                "compliance_impact": "string",
-                "regulatory_considerations": ["string"]
-            }},
-            "recommendations": {{
-                "immediate_actions": [
-                    {{
-                        "action": "string",
-                        "timeline": "string",
-                        "responsible_team": "string",
-                        "success_criteria": "string"
-                    }}
-                ],
-                "short_term_improvements": ["string"],
-                "long_term_strategy": ["string"],
-                "security_controls": [
-                    {{
-                        "control_type": "string",
-                        "description": "string",
-                        "implementation_priority": "High|Medium|Low"
-                    }}
-                ]
-            }},
-            "metrics": {{
-                "validation_accuracy": "number",
-                "false_positive_rate": "number",
-                "coverage_percentage": "number",
-                "time_to_validate": "string",
-                "tools_effectiveness": {{
-{tools_effectiveness_section}
-                }}
-            }}
-        }}
+                    "final_status": "CONFIRMADA|FALSO_POSITIVO|INCONCLUSA",
+                    "final_severity": "Critical|High|Medium|Low",
+                    "evidence_summary": "string - Resumen de la evidencia encontrada",
+                    "remediation": "string - Recomendaciones de remediación"
+                }
+            ]
+        }
         """
         
         return Task(
